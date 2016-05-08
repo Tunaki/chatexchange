@@ -19,17 +19,17 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 
 public final class ChatRoom {
-	
+
 	private static final String SUCCESS = "ok";
 
 	private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
-	
+
 	private long roomId;
 	private String host;
 	private String fkey;
-	
+
 	private Map<String, String> cookies = new HashMap<>();
-	
+
 	ChatRoom(String host, long roomId, Map<String, String> cookies) {
 		this.roomId = roomId;
 		this.host = host;
@@ -37,15 +37,15 @@ public final class ChatRoom {
 		fkey = retrieveFKey(roomId);
 		executor.scheduleAtFixedRate(() -> fkey = retrieveFKey(roomId), 0, 1, TimeUnit.HOURS);
 	}
-	
+
 	private Connection connectBase(String url) {
 		return Jsoup.connect(url).cookies(cookies).ignoreContentType(true);
 	}
-	
+
 	private Response get(String url) throws IOException {
 		return connectBase(url).method(Method.GET).execute();
 	}
-	
+
 	private JsonElement post(String url, String... data) {
 		Response response;
 		try {
@@ -55,7 +55,7 @@ public final class ChatRoom {
 		}
 		return new JsonParser().parse(response.body());
 	}
-	
+
 	private String retrieveFKey(long roomId) {
 		try {
 			Response response = get("http://chat.stackoverflow.com/rooms/" + roomId);
@@ -65,28 +65,28 @@ public final class ChatRoom {
 			throw new UncheckedIOException(e);
 		}
 	}
-		
-    public long send(String message) {
-    	return post("http://chat." + host + "/chats/" + roomId + "/messages/new", "text", message).getAsJsonObject().get("id").getAsLong();
-    }
-    
-    public boolean edit(long messageId, String message) {
-    	return SUCCESS.equals(post("http://chat." + host + "/messages/" + messageId, "text", message).getAsString());
-    }
-    
-    public boolean delete(long messageId) {
+
+	public long send(String message) {
+		return post("http://chat." + host + "/chats/" + roomId + "/messages/new", "text", message).getAsJsonObject().get("id").getAsLong();
+	}
+
+	public boolean edit(long messageId, String message) {
+		return SUCCESS.equals(post("http://chat." + host + "/messages/" + messageId, "text", message).getAsString());
+	}
+
+	public boolean delete(long messageId) {
 		return SUCCESS.equals(post("http://chat." + host + "/messages/" + messageId + "/delete").getAsString());
 	}
 
 	public boolean toggleStar(long messageId) {
-    	return SUCCESS.equals(post("http://chat." + host + "/messages/" + messageId + "/star").getAsString());
-    }
-    
-    public boolean togglePin(long messageId) {
-    	return SUCCESS.equals(post("http://chat." + host + "/messages/" + messageId + "/owner-star").getAsString());
-    }
-    
-    public long getRoomId() {
+		return SUCCESS.equals(post("http://chat." + host + "/messages/" + messageId + "/star").getAsString());
+	}
+
+	public boolean togglePin(long messageId) {
+		return SUCCESS.equals(post("http://chat." + host + "/messages/" + messageId + "/owner-star").getAsString());
+	}
+
+	public long getRoomId() {
 		return roomId;
 	}
 
@@ -96,8 +96,8 @@ public final class ChatRoom {
 
 	void close() {
 		executor.shutdownNow();
-    }
-	
+	}
+
 	public static void main(String[] args) {
 		Properties properties = new Properties();
 		try (FileReader reader = new FileReader(System.getProperty("user.home") + "/chat.properties")) {
@@ -127,7 +127,10 @@ public final class ChatRoom {
 	}
 
 	private static void throttle() {
-		try { Thread.sleep(5000); } catch (InterruptedException e) { }
+		try {
+			Thread.sleep(5000);
+		} catch (InterruptedException e) {
+		}
 	}
 
 }

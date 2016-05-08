@@ -15,18 +15,18 @@ import org.jsoup.Connection.Response;
 import org.jsoup.Jsoup;
 
 public class Client {
-	
+
 	private static final Pattern OPEN_ID_PROVIDER_PATTERN = Pattern.compile("(https://openid.stackexchange.com/user/.*?)\"");
-	
+
 	private String openIdProvider;
 	private Map<String, String> cookies = new HashMap<>();
-	
+
 	static {
 		System.setProperty("http.agent", "Mozilla");
 	}
-	
+
 	private List<ChatRoom> rooms = new ArrayList<>();
-	
+
 	public Client(String email, String password) {
 		try {
 			SEOpenIdLogin(email, password);
@@ -34,19 +34,19 @@ public class Client {
 			throw new UncheckedIOException(e);
 		}
 	}
-	
+
 	private void SEOpenIdLogin(String email, String password) throws IOException {
-	    Response response = Jsoup.connect("https://openid.stackexchange.com/account/login").method(Method.GET).execute();
-	    String fkey = response.parse().select("input[name='fkey']").val();
-	    response = Jsoup.connect("https://openid.stackexchange.com/account/login/submit").data("email", email, "password", password, "fkey", fkey).method(Method.POST).cookies(response.cookies()).execute();
-	    cookies.putAll(response.removeCookie("anon").cookies());
-	    Matcher matcher = OPEN_ID_PROVIDER_PATTERN.matcher(response.parse().getElementById("delegate").html());
-	    if (!matcher.find()) {
-	    	throw new IllegalStateException("Cannot retrieve the Open ID provider");
-	    }
-	    openIdProvider = matcher.group(1);
+		Response response = Jsoup.connect("https://openid.stackexchange.com/account/login").method(Method.GET).execute();
+		String fkey = response.parse().select("input[name='fkey']").val();
+		response = Jsoup.connect("https://openid.stackexchange.com/account/login/submit").data("email", email, "password", password, "fkey", fkey).method(Method.POST).cookies(response.cookies()).execute();
+		cookies.putAll(response.removeCookie("anon").cookies());
+		Matcher matcher = OPEN_ID_PROVIDER_PATTERN.matcher(response.parse().getElementById("delegate").html());
+		if (!matcher.find()) {
+			throw new IllegalStateException("Cannot retrieve the Open ID provider");
+		}
+		openIdProvider = matcher.group(1);
 	}
-	
+
 	public ChatRoom joinRoom(String host, long roomId) {
 		if (rooms.stream().anyMatch(r -> r.getHost().equals(host) && r.getRoomId() == roomId)) {
 			throw new RuntimeException("Cannot join a room you are already in");
@@ -71,14 +71,14 @@ public class Client {
 		cookies.putAll(response.cookies());
 		checkLoggedIn(host);
 	}
-	
+
 	private void checkLoggedIn(String host) throws IOException {
-        Response response = Jsoup.connect("http://" + host + "/users/current").method(Method.GET).cookies(cookies).execute();
-        if (response.parse().getElementsByClass("reputation").first() == null) {
-            throw new IllegalStateException("Unable to login to Stack Exchange.");
-        }
-    }
-	
+		Response response = Jsoup.connect("http://" + host + "/users/current").method(Method.GET).cookies(cookies).execute();
+		if (response.parse().getElementsByClass("reputation").first() == null) {
+			throw new IllegalStateException("Unable to login to Stack Exchange.");
+		}
+	}
+
 	public void close() {
 		rooms.forEach(ChatRoom::close);
 	}
