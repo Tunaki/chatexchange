@@ -109,21 +109,25 @@ public final class ChatRoom {
 		Client client = new Client(properties.getProperty("email"), properties.getProperty("password"));
 		ChatRoom room = client.joinRoom("stackoverflow.com", 108192);
 		long messageId = room.send("Blob blob blob");
-		try { Thread.sleep(5000); } catch (InterruptedException e) { }
+		throttle();
 		room.edit(messageId, "Plop plop plop");
-		try { Thread.sleep(5000); } catch (InterruptedException e) { }
+		throttle();
 		room.delete(messageId);
 		messageId = 30404221;
-		try { Thread.sleep(5000); } catch (InterruptedException e) { }
+		throttle();
 		System.out.println(room.toggleStar(messageId));
-		try { Thread.sleep(5000); } catch (InterruptedException e) { }
+		throttle();
 		System.out.println(room.toggleStar(messageId));
-		try { Thread.sleep(5000); } catch (InterruptedException e) { }
+		throttle();
 		System.out.println(room.togglePin(messageId));
-		try { Thread.sleep(5000); } catch (InterruptedException e) { }
+		throttle();
 		System.out.println(room.togglePin(messageId));
-		try { Thread.sleep(5000); } catch (InterruptedException e) { }
+		throttle();
 		client.close();
+	}
+
+	private static void throttle() {
+		try { Thread.sleep(5000); } catch (InterruptedException e) { }
 	}
 
 }
