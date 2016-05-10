@@ -41,7 +41,7 @@ public class StackExchangeClient {
 
 	public Room joinRoom(String host, long roomId) {
 		if (rooms.stream().anyMatch(r -> r.getHost().equals(host) && r.getRoomId() == roomId)) {
-			throw new ChatOperationException("Cannot join a room you are already in");
+			throw new ChatOperationException("Cannot join a room you are already in.");
 		}
 		if (rooms.stream().allMatch(r -> !r.getHost().equals(host))) {
 			try {
