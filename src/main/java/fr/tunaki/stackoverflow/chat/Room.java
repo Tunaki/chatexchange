@@ -170,6 +170,16 @@ public final class Room {
 		};
 		return CompletableFuture.supplyAsync(supplier, messageEventExecutor);
 	}
+	
+	/**
+	 * Sends a reply message to the given message id.
+	 * @param messageId Id of the message to reply to.
+	 * @param message Message consisting of the reply.
+	 * @return A future holding the id of the newly sent message.
+	 */
+	public CompletableFuture<Long> replyTo(long messageId, String message) {
+		return send(":" + messageId + " " + message);
+	}
 
 	public CompletableFuture<Void> edit(long messageId, String message) {
 		LOGGER.info("Task added - editing message {} in room {}.", messageId, roomId);
