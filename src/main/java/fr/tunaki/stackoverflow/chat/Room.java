@@ -79,6 +79,8 @@ public final class Room {
 	private String host;
 	private String fkey;
 	private HttpClient httpClient;
+	
+	private boolean hasLeft = false;
 
 	Room(String host, long roomId, HttpClient httpClient) {
 		this.roomId = roomId;
@@ -219,6 +221,17 @@ public final class Room {
 			return null;
 		};
 		return CompletableFuture.supplyAsync(supplier, messageEventExecutor);
+	}
+	
+	/**
+	 * Causes the current logged user to leave the room.
+	 * <p>Calling this method multiple times has no effect.
+	 */
+	public void leave() {
+		if (hasLeft) return;
+		post("http://chat." + host + "/chats/leave/" + roomId, "quiet", "true");
+		close();
+		hasLeft = true;
 	}
 
 	public long getRoomId() {
