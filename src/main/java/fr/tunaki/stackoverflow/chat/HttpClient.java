@@ -13,7 +13,7 @@ import org.jsoup.Jsoup;
  * <p>It stores a map of current cookies and updates them at each calls.
  * @author Tunaki
  */
-public class HttpClient {
+class HttpClient {
 	
 	private Map<String, String> cookies;
 	

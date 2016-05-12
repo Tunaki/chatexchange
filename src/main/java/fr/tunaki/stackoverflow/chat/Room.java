@@ -247,8 +247,7 @@ public final class Room {
 			e.printStackTrace();
 			return;
 		}
-		HttpClient httpClient = new HttpClient();
-		StackExchangeClient client = new StackExchangeClient(properties.getProperty("email"), properties.getProperty("password"), httpClient);
+		StackExchangeClient client = new StackExchangeClient(properties.getProperty("email"), properties.getProperty("password"));
 		try {
 			Room room = client.joinRoom("stackoverflow.com", 111347);
 			while(true);

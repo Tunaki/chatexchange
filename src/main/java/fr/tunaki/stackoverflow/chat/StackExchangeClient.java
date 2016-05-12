@@ -19,8 +19,8 @@ public class StackExchangeClient {
 
 	private List<Room> rooms = new ArrayList<>();
 
-	public StackExchangeClient(String email, String password, HttpClient httpClient) {
-		this.httpClient = httpClient;
+	public StackExchangeClient(String email, String password) {
+		httpClient = new HttpClient();
 		try {
 			SEOpenIdLogin(email, password);
 		} catch (IOException e) {
