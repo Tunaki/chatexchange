@@ -47,9 +47,10 @@ public final class Room {
 
 	private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
 
-	private final Executor messageEventExecutor = new Executor() {
+	private Executor messageEventExecutor = new Executor() {
 
 		private final Semaphore semaphore = new Semaphore(1);
+		private long lastEndTime = 0;
 
 		@Override
 		public void execute(Runnable command) {
@@ -60,14 +61,18 @@ public final class Room {
 					acquired = true;
 				} catch (InterruptedException e) { }
 			} while (!acquired);
-			try {
-				Thread.sleep(THROTTLE_MS);
-			} catch (InterruptedException e) { }
+			long timeBetweenLastCall = System.currentTimeMillis() - lastEndTime;
+			if (timeBetweenLastCall < THROTTLE_MS) {
+				try {
+					Thread.sleep(THROTTLE_MS - timeBetweenLastCall);
+				} catch (InterruptedException e) { }
+			}
 			try {
 				command.run();
 			} finally {
 				semaphore.release();
 			}
+			lastEndTime = System.currentTimeMillis();
 		}
 
 	};
@@ -239,6 +244,7 @@ public final class Room {
 	 */
 	public void leave() {
 		if (hasLeft) return;
+		LOGGER.debug("Leaving room {} on {}", roomId, host);
 		post("http://chat." + host + "/chats/leave/" + roomId, "quiet", "true");
 		close();
 		hasLeft = true;
