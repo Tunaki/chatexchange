@@ -163,7 +163,7 @@ public final class Room {
 		LOGGER.debug("Received message: " + json);
 		JsonObject jsonObject = new JsonParser().parse(json).getAsJsonObject();
 		jsonObject.entrySet().stream().filter(e -> e.getKey().equals("r" + roomId)).map(Map.Entry::getValue).map(JsonElement::getAsJsonObject).map(o -> o.get("e")).map(JsonElement::getAsJsonArray).findFirst().ifPresent(events -> { 
-			for (Event<?> event : Events.fromJsonData(events)) {
+			for (Event<?> event : Events.fromJsonData(events, roomId)) {
 				for (Consumer<Object> listener : chatEventListeners.getOrDefault(event, Collections.emptyList())) {
 					listener.accept(event.message());
 				}

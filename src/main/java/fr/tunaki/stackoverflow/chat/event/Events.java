@@ -19,12 +19,14 @@ public final class Events {
 	/**
 	 * Transforms the raw chat events to a list of event instances, with their corresponding data.
 	 * @param events Raw chat events, as returned the the StackExchange chat websockets.
+	 * @param roomId Id of the room to return events from.
 	 * @return List of events with their data.
 	 */
-	public static List<Event<?>> fromJsonData(JsonArray events) {
+	public static List<Event<?>> fromJsonData(JsonArray events, long roomId) {
 		//TODO: special trickery for 2 event types meaning a single real event, like kicking or adding as RO
 		return StreamSupport.stream(events.spliterator(), false)
 				.map(JsonElement::getAsJsonObject)
+				.filter(object -> object.get("room_id").getAsLong() == roomId)
 				.map(object -> {
 					int eventType = object.get("event_type").getAsInt();
 					switch (eventType) {
