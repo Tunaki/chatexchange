@@ -12,7 +12,7 @@ import com.google.gson.JsonObject;
  * Holds the data for an edit message event.
  * @author Tunaki
  */
-public class MessageEditedEvent {
+public class MessageEditedEvent implements UserEvent {
 	
 	private Instant instant;
 	private String content;
@@ -31,52 +31,44 @@ public class MessageEditedEvent {
 		this.editCount = jsonObject.get("message_edits").getAsInt();
 	}
 
-	/**
-	 * Returns the instant in time (UTC) at which this event occured.
-	 * @return Instant in time (UTC) at which this event occured.
-	 */
+	@Override
 	public Instant getInstant() {
 		return instant;
 	}
 
-	/**
-	 * Returns the content of the message.
-	 * @return Content of the message.
-	 */
+	@Override
 	public String getContent() {
 		return content;
 	}
 
-	/**
-	 * Returns the id of the user that edited the message.
-	 * @return Id of the user that edited the message.
-	 */
+	@Override
 	public long getUserId() {
 		return userId;
 	}
 
-	/**
-	 * Returns the display name of the user that edited the message.
-	 * @return Display name of the user that edited the message.
-	 */
+	@Override
 	public String getUserName() {
 		return userName;
 	}
 
-	/**
-	 * Returns the id of the edited message.
-	 * @return Id of the edited message.
-	 */
+	@Override
 	public long getMessageId() {
 		return messageId;
 	}
 
-	/**
-	 * Returns how many times the message was edited.
-	 * @return Number of times the message was edited.
-	 */
+	@Override
 	public int getEditCount() {
 		return editCount;
+	}
+
+	@Override
+	public long getTargetUserId() {
+		return -1;
+	}
+
+	@Override
+	public long getParentMessageId() {
+		return -1;
 	}
 
 	@Override

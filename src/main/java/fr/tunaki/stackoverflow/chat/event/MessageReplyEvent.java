@@ -12,7 +12,7 @@ import com.google.gson.JsonObject;
  * Holds the data for an reply message event.
  * @author Tunaki
  */
-public class MessageReplyEvent {
+public class MessageReplyEvent implements UserEvent {
 	
 	private Instant instant;
 	private String content;
@@ -35,66 +35,42 @@ public class MessageReplyEvent {
 		this.editCount = jsonObject.get("message_edits").getAsInt();
 	}
 	
-	/**
-	 * Returns the instant in time (UTC) at which this event occured.
-	 * @return Instant in time (UTC) at which this event occured.
-	 */
+	@Override
 	public Instant getInstant() {
 		return instant;
 	}
 
-	/**
-	 * Returns the content of the message.
-	 * @return Content of the message.
-	 */
+	@Override
 	public String getContent() {
 		return content;
 	}
 
-	/**
-	 * Returns the id of the user that made the reply.
-	 * @return Id of the user that made the reply.
-	 */
+	@Override
 	public long getUserId() {
 		return userId;
 	}
 
-	/**
-	 * Returns the id of the user targeted by the reply.
-	 * @return Id of the user targeted by the reply.
-	 */
+	@Override
 	public long getTargetUserId() {
 		return targetUserId;
 	}
 
-	/**
-	 * Returns the display name of the user that made the reply.
-	 * @return Display name of the user that made the reply.
-	 */
+	@Override
 	public String getUserName() {
 		return userName;
 	}
 
-	/**
-	 * Returns the id of the reply message.
-	 * @return Id of the reply message.
-	 */
+	@Override
 	public long getMessageId() {
 		return messageId;
 	}
 
-	/**
-	 * Returns the id of the message replied to.
-	 * @return Id of the message replied to.
-	 */
+	@Override
 	public long getParentMessageId() {
 		return parentMessageId;
 	}
 
-	/**
-	 * Returns how many times the message was edited.
-	 * @return Number of times the message was edited.
-	 */
+	@Override
 	public int getEditCount() {
 		return editCount;
 	}

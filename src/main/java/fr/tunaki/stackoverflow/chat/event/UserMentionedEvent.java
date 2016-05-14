@@ -12,7 +12,7 @@ import com.google.gson.JsonObject;
  * Holds the data for a mention message event.
  * @author Tunaki
  */
-public class UserMentionedEvent {
+public class UserMentionedEvent implements UserEvent {
 	
 	private Instant instant;
 	private String content;
@@ -35,66 +35,42 @@ public class UserMentionedEvent {
 		this.editCount = jsonObject.get("message_edits").getAsInt();
 	}
 
-	/**
-	 * Returns the instant in time (UTC) at which this event occured.
-	 * @return Instant in time (UTC) at which this event occured.
-	 */
+	@Override
 	public Instant getInstant() {
 		return instant;
 	}
 
-	/**
-	 * Returns the content of the message.
-	 * @return Content of the message.
-	 */
+	@Override
 	public String getContent() {
 		return content;
 	}
 
-	/**
-	 * Returns the id of the user that made the mention.
-	 * @return Id of the user that made the mention.
-	 */
+	@Override
 	public long getUserId() {
 		return userId;
 	}
 
-	/**
-	 * Returns the id of the user targeted by the mention.
-	 * @return Id of the user targeted by the mention.
-	 */
+	@Override
 	public long getTargetUserId() {
 		return targetUserId;
 	}
 
-	/**
-	 * Returns the display name of the user that made the mention.
-	 * @return Display name of the user that made the mention.
-	 */
+	@Override
 	public String getUserName() {
 		return userName;
 	}
 
-	/**
-	 * Returns the id of the mention message.
-	 * @return Id of the mention message.
-	 */
+	@Override
 	public long getMessageId() {
 		return messageId;
 	}
 
-	/**
-	 * Returns the id of the message mentioned.
-	 * @return Id of the message mentioned.
-	 */
+	@Override
 	public long getParentMessageId() {
 		return parentMessageId;
 	}
 
-	/**
-	 * Returns how many times the message was edited.
-	 * @return Number of times the message was edited.
-	 */
+	@Override
 	public int getEditCount() {
 		return editCount;
 	}

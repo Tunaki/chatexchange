@@ -12,7 +12,7 @@ import com.google.gson.JsonObject;
  * Holds the data for an post message event.
  * @author Tunaki
  */
-public class MessagePostedEvent {
+public class MessagePostedEvent implements UserEvent {
 	
 	private Instant instant;
 	private String content;
@@ -29,44 +29,44 @@ public class MessagePostedEvent {
 		this.messageId = jsonObject.get("message_id").getAsLong();
 	}
 
-	/**
-	 * Returns the instant in time (UTC) at which this event occured.
-	 * @return Instant in time (UTC) at which this event occured.
-	 */
+	@Override
 	public Instant getInstant() {
 		return instant;
 	}
 
-	/**
-	 * Returns the content of the message.
-	 * @return Content of the message.
-	 */
+	@Override
 	public String getContent() {
 		return content;
 	}
 
-	/**
-	 * Returns the id of the user that posted the message.
-	 * @return Id of the user that posted the message.
-	 */
+	@Override
 	public long getUserId() {
 		return userId;
 	}
 
-	/**
-	 * Returns the display name of the user that posted the message.
-	 * @return Display name of the user that posted the message.
-	 */
+	@Override
 	public String getUserName() {
 		return userName;
 	}
 
-	/**
-	 * Returns the id of the posted message.
-	 * @return Id of the posted message.
-	 */
+	@Override
 	public long getMessageId() {
 		return messageId;
+	}
+
+	@Override
+	public long getTargetUserId() {
+		return -1;
+	}
+
+	@Override
+	public long getParentMessageId() {
+		return -1;
+	}
+
+	@Override
+	public int getEditCount() {
+		return 1;
 	}
 
 	@Override
