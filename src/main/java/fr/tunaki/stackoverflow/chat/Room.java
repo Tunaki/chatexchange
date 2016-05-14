@@ -153,6 +153,10 @@ public final class Room {
 			            }
 			        });
 			    }
+			    @Override
+			    public void onError(Session session, Throwable thr) {
+			    	LOGGER.error("An error occured during the processing of a message", thr);
+			    }
 			}, configBuilder.build(), new URI(websocketUrl));
 		} catch (DeploymentException | IOException | URISyntaxException e) {
 			throw new ChatOperationException("Cannot connect to chat websocket", e);
