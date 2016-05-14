@@ -1,7 +1,6 @@
 package fr.tunaki.stackoverflow.chat;
 
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.Map;
 
 import org.jsoup.Connection.Method;
@@ -10,16 +9,10 @@ import org.jsoup.Jsoup;
 
 /**
  * Client for raw HTTP requests.
- * <p>It stores a map of current cookies and updates them at each calls.
+ * <p>It takes a map of current cookies and updates them at each calls.
  * @author Tunaki
  */
 class HttpClient {
-	
-	private Map<String, String> cookies;
-	
-	public HttpClient() {
-		cookies = new HashMap<>();
-	}
 	
 	/**
 	 * Performs a GET HTTP call to the given URL.
@@ -27,7 +20,7 @@ class HttpClient {
 	 * @return <code>Response</code> associated with the result of the request.
 	 * @throws IOException in case of errors
 	 */
-	public Response get(String url) throws IOException {
+	public Response get(String url, Map<String, String> cookies) throws IOException {
 		Response response = Jsoup.connect(url).ignoreContentType(true).method(Method.GET).cookies(cookies).userAgent("Mozilla").execute();
 		cookies.putAll(response.cookies());
 		return response;
@@ -40,7 +33,7 @@ class HttpClient {
 	 * @return <code>Response</code> associated with the result of the request.
 	 * @throws IOException in case of errors
 	 */
-	public Response post(String url, String... data) throws IOException {
+	public Response post(String url, Map<String, String> cookies, String... data) throws IOException {
 		Response response = Jsoup.connect(url).ignoreContentType(true).method(Method.POST).cookies(cookies).userAgent("Mozilla").data(data).execute();
 		cookies.putAll(response.cookies());
 		return response;

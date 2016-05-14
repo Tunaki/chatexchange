@@ -4,18 +4,23 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URLEncoder;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.jsoup.Connection.Response;
+import org.jsoup.nodes.Document;
 
 public class StackExchangeClient {
 
 	private static final Pattern OPEN_ID_PROVIDER_PATTERN = Pattern.compile("(https://openid.stackexchange.com/user/.*?)\"");
 
 	private String openIdProvider;
+	
 	private HttpClient httpClient;
+	private Map<String, String> cookies = new HashMap<>();
 
 	private List<Room> rooms = new ArrayList<>();
 
@@ -29,12 +34,16 @@ public class StackExchangeClient {
 	}
 
 	private void SEOpenIdLogin(String email, String password) throws IOException {
-		Response response = httpClient.get("https://openid.stackexchange.com/account/login");
+		Response response = httpClient.get("https://openid.stackexchange.com/account/login", cookies);
 		String fkey = response.parse().select("input[name='fkey']").val();
-		response = httpClient.post("https://openid.stackexchange.com/account/login/submit", "email", email, "password", password, "fkey", fkey);
-		Matcher matcher = OPEN_ID_PROVIDER_PATTERN.matcher(response.parse().getElementById("delegate").html());
+		response = httpClient.post("https://openid.stackexchange.com/account/login/submit", cookies, "email", email, "password", password, "fkey", fkey);
+		Document document = response.parse();
+		if (document.getElementsByClass("error").size() > 0) {
+			throw new ChatOperationException("Invalid OpenID credentials");
+		}
+		Matcher matcher = OPEN_ID_PROVIDER_PATTERN.matcher(document.getElementById("delegate").html());
 		if (!matcher.find()) {
-			throw new IllegalStateException("Cannot retrieve the Open ID provider");
+			throw new IllegalStateException("Cannot retrieve the OpenID provider");
 		}
 		openIdProvider = matcher.group(1);
 	}
@@ -50,20 +59,20 @@ public class StackExchangeClient {
 				throw new UncheckedIOException(e);
 			}
 		}
-		Room chatRoom = new Room(host, roomId, httpClient);
+		Room chatRoom = new Room(host, roomId, httpClient, cookies);
 		rooms.add(chatRoom);
 		return chatRoom;
 	}
 
 	private void siteLogin(String host) throws IOException {
-		Response response = httpClient.get("http://" + host + "/users/login?returnurl=" + URLEncoder.encode("http://" + host + "/", "UTF-8"));
+		Response response = httpClient.get("http://" + host + "/users/login?returnurl=" + URLEncoder.encode("http://" + host + "/", "UTF-8"), cookies);
 		String fkey = response.parse().select("input[name='fkey']").val();
-		response = httpClient.post("http://" + host + "/users/authenticate", "fkey", fkey, "openid_identifier", openIdProvider);
+		response = httpClient.post("http://" + host + "/users/authenticate", cookies, "fkey", fkey, "openid_identifier", openIdProvider);
 		checkLoggedIn(host);
 	}
 
 	private void checkLoggedIn(String host) throws IOException {
-		Response response = httpClient.get("http://" + host + "/users/current");
+		Response response = httpClient.get("http://" + host + "/users/current", cookies);
 		if (response.parse().getElementsByClass("reputation").first() == null) {
 			throw new IllegalStateException("Unable to login to Stack Exchange.");
 		}
