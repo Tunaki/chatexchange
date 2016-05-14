@@ -32,7 +32,7 @@ public class MessageReplyEvent implements UserEvent {
 		this.userName = jsonObject.get("user_name").getAsString();
 		this.messageId = jsonObject.get("message_id").getAsLong();
 		this.parentMessageId = jsonObject.get("parent_id").getAsLong();
-		this.editCount = jsonObject.get("message_edits").getAsInt();
+		this.editCount = jsonObject.get("message_edits") == null ? 0 : jsonObject.get("message_edits").getAsInt();
 	}
 	
 	@Override
