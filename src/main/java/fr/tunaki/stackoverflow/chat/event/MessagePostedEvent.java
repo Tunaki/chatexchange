@@ -66,7 +66,7 @@ public class MessagePostedEvent implements UserEvent {
 
 	@Override
 	public int getEditCount() {
-		return 1;
+		return 0;
 	}
 
 	@Override
