@@ -1,6 +1,8 @@
 package fr.tunaki.stackoverflow.chat.event;
 
 import java.time.Instant;
+import java.util.function.Function;
+import java.util.function.ToIntFunction;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -24,7 +26,7 @@ public abstract class Event {
 		JsonObject jsonObject = jsonElement.getAsJsonObject();
 		instant = Instant.ofEpochSecond(jsonObject.get("time_stamp").getAsLong());
 		userId = jsonObject.get("user_id").getAsLong();
-		userName = orDefault(jsonObject.get("user_name"), null);
+		userName = orDefault(jsonObject.get("user_name"), null, JsonElement::getAsString);
 	}
 	
 	/**
@@ -51,12 +53,12 @@ public abstract class Event {
 		return userName;
 	}
 	
-	protected String orDefault(JsonElement element, String defaultValue) {
-		return element == null ? defaultValue : element.getAsString();
+	protected <T> T orDefault(JsonElement element, T defaultValue, Function<JsonElement, T> function) {
+		return element == null ? defaultValue : function.apply(element);
 	}
 	
-	protected int orDefault(JsonElement element, int defaultValue) {
-		return element == null ? defaultValue : element.getAsInt();
+	protected int orDefault(JsonElement element, int defaultValue, ToIntFunction<JsonElement> function) {
+		return element == null ? defaultValue : function.applyAsInt(element);
 	}
 	
 	protected boolean orDefault(JsonElement element, boolean defaultValue) {

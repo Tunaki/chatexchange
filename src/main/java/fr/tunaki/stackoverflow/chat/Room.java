@@ -345,6 +345,7 @@ public final class Room {
 			room.addEventListener(EventType.MESSAGE_STARRED, e -> {
 				System.out.println(e.getStarCount() + " " + e.getPinCount());
 			});
+			room.addEventListener(EventType.MESSAGE_DELETED, System.out::println);
 //			room2.addEventListener(Event.MESSAGE_POSTED, e -> {
 //				room2.replyTo(e.getMessageId(), "blob");
 //				System.out.println(e);

@@ -58,6 +58,11 @@ public final class EventType<T> {
 	 */
 	public static final EventType<MessageStarredEvent> MESSAGE_STARRED = new EventType<>(MessageStarredEvent::new);
 	
+	/**
+	 * Event raised when a message is deleted.
+	 */
+	public static final EventType<MessageDeletedEvent> MESSAGE_DELETED = new EventType<>(MessageDeletedEvent::new);
+	
 	private final Function<JsonElement, T> function;
 	private T message;
 	

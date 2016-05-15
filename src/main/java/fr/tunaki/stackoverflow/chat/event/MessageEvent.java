@@ -23,15 +23,15 @@ public abstract class MessageEvent extends Event {
 	MessageEvent(JsonElement jsonElement) {
 		super(jsonElement);
 		JsonObject jsonObject = jsonElement.getAsJsonObject();
-		content = Jsoup.clean(jsonObject.get("content").getAsString(), Whitelist.relaxed());
+		content = orDefault(jsonObject.get("content"), null, e -> Jsoup.clean(e.getAsString(), Whitelist.relaxed()));
 		messageId = jsonObject.get("message_id").getAsLong();
-		editCount = orDefault(jsonObject.get("message_edits"), 0);
-		starCount = orDefault(jsonObject.get("message_stars"), 0);
-		pinCount = orDefault(jsonObject.get("message_owner_stars"), 0);
+		editCount = orDefault(jsonObject.get("message_edits"), 0, JsonElement::getAsInt);
+		starCount = orDefault(jsonObject.get("message_stars"), 0, JsonElement::getAsInt);
+		pinCount = orDefault(jsonObject.get("message_owner_stars"), 0, JsonElement::getAsInt);
 	}
 
 	/**
-	 * Returns the content of the message.
+	 * Returns the content of the message. This can be <code>null</code> (for example in the case of a deleted message event). 
 	 * @return Content of the message.
 	 */
 	public String getContent() {
