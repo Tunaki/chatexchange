@@ -53,6 +53,11 @@ public final class EventType<T> {
 	 */
 	public static final EventType<UserLeftEvent> USER_LEFT = new EventType<>(UserLeftEvent::new);
 	
+	/**
+	 * Event raised when a message is starred, unstarred, pinned or unpinned.
+	 */
+	public static final EventType<MessageStarredEvent> MESSAGE_STARRED = new EventType<>(MessageStarredEvent::new);
+	
 	private final Function<JsonElement, T> function;
 	private T message;
 	

@@ -325,7 +325,7 @@ public final class Room {
 		StackExchangeClient client = new StackExchangeClient(properties.getProperty("email"), properties.getProperty("password"));
 		try {
 			CountDownLatch countDownLatch = new CountDownLatch(1);
-			Room room = client.joinRoom("stackoverflow.com", 68414);
+			Room room = client.joinRoom("stackoverflow.com", 111347);
 //			Room room2 = client.joinRoom("stackoverflow.com", 95290);
 			room.addEventListener(EventType.MESSAGE_POSTED, e -> {
 				System.out.println(e);
@@ -341,6 +341,9 @@ public final class Room {
 			});
 			room.addEventListener(EventType.USER_LEFT, e -> {
 				System.out.println(e.getInstant() + " " + e.getUserId() + " " + e.getUserName());
+			});
+			room.addEventListener(EventType.MESSAGE_STARRED, e -> {
+				System.out.println(e.getStarCount() + " " + e.getPinCount());
 			});
 //			room2.addEventListener(Event.MESSAGE_POSTED, e -> {
 //				room2.replyTo(e.getMessageId(), "blob");

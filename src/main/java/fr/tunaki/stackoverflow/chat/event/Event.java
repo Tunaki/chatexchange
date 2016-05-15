@@ -24,7 +24,7 @@ public abstract class Event {
 		JsonObject jsonObject = jsonElement.getAsJsonObject();
 		instant = Instant.ofEpochSecond(jsonObject.get("time_stamp").getAsLong());
 		userId = jsonObject.get("user_id").getAsLong();
-		userName = jsonObject.get("user_name").getAsString();
+		userName = orDefault(jsonObject.get("user_name"), null);
 	}
 	
 	/**
@@ -44,11 +44,23 @@ public abstract class Event {
 	}
 
 	/**
-	 * Returns the display name of the user that raised this event.
+	 * Returns the display name of the user that raised this event. This can be <code>null</code> under unreproducible conditions.
 	 * @return Display name of the user that raised this event.
 	 */
 	public String getUserName() {
 		return userName;
+	}
+	
+	protected String orDefault(JsonElement element, String defaultValue) {
+		return element == null ? defaultValue : element.getAsString();
+	}
+	
+	protected int orDefault(JsonElement element, int defaultValue) {
+		return element == null ? defaultValue : element.getAsInt();
+	}
+	
+	protected boolean orDefault(JsonElement element, boolean defaultValue) {
+		return element == null ? defaultValue : element.getAsBoolean();
 	}
 	
 }

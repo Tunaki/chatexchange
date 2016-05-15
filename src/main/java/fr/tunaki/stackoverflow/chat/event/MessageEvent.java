@@ -17,13 +17,17 @@ public abstract class MessageEvent extends Event {
 	private String content;
 	private long messageId;
 	private int editCount;
+	private int starCount;
+	private int pinCount;
 
 	MessageEvent(JsonElement jsonElement) {
 		super(jsonElement);
 		JsonObject jsonObject = jsonElement.getAsJsonObject();
 		content = Jsoup.clean(jsonObject.get("content").getAsString(), Whitelist.relaxed());
 		messageId = jsonObject.get("message_id").getAsLong();
-		editCount = jsonObject.has("message_edits") ? jsonObject.get("message_edits").getAsInt() : 0;
+		editCount = orDefault(jsonObject.get("message_edits"), 0);
+		starCount = orDefault(jsonObject.get("message_stars"), 0);
+		pinCount = orDefault(jsonObject.get("message_owner_stars"), 0);
 	}
 
 	/**
@@ -50,5 +54,20 @@ public abstract class MessageEvent extends Event {
 		return editCount;
 	}
 
+	/**
+	 * Returns how many times the message was starred.
+	 * @return Number of times the message was starred.
+	 */
+	public int getStarCount() {
+		return starCount;
+	}
+
+	/**
+	 * Returns how many times the message was pinned.
+	 * @return Number of times the message was pinned.
+	 */
+	public int getPinCount() {
+		return pinCount;
+	}
 	
 }

@@ -38,6 +38,7 @@ public final class Events {
 					case 2: return EventType.MESSAGE_EDITED.withData(object);
 					case 3: return EventType.USER_ENTERED.withData(object);
 					case 4: return EventType.USER_LEFT.withData(object);
+					case 6: return EventType.MESSAGE_STARRED.withData(object);
 					case 8: return EventType.USER_MENTIONED.withData(object);
 					case 18: return EventType.MESSAGE_REPLY.withData(object);
 					default:
