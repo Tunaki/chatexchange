@@ -75,9 +75,9 @@ public final class Room {
 			try {
 				command.run();
 			} finally {
+				lastEndTime = System.currentTimeMillis();
 				semaphore.release();
 			}
-			lastEndTime = System.currentTimeMillis();
 		}
 
 	};
