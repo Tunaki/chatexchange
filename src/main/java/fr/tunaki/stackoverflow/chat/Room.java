@@ -105,17 +105,20 @@ public final class Room {
 	}
 
 	private JsonElement post(String url, String... data) {
+		try {
+			Response response = httpClient.post(url, cookies, withFkey(data));
+			return new JsonParser().parse(response.body());
+		} catch (IOException e) {
+			throw new ChatOperationException(e);
+		}
+	}
+	
+	private String[] withFkey(String[] data) {
 		String[] dataWithFKey = new String[data.length + 2];
 		dataWithFKey[0] = "fkey";
 		dataWithFKey[1] = fkey;
 		System.arraycopy(data, 0, dataWithFKey, 2, data.length);
-		Response response;
-		try {
-			response = httpClient.post(url, cookies, dataWithFKey);
-		} catch (IOException e) {
-			throw new ChatOperationException(e);
-		}
-		return new JsonParser().parse(response.body());
+		return dataWithFKey;
 	}
 
 	private String retrieveFKey(long roomId) {

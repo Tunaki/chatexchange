@@ -15,28 +15,33 @@ import org.jsoup.Jsoup;
 class HttpClient {
 	
 	/**
-	 * Performs a GET HTTP call to the given URL.
+	 * Performs a HTTP GET to the given URL.
 	 * @param url URL to GET.
+	 * @param cookies Cookies to send with the request.
+	 * @param data GET parameters.
 	 * @return <code>Response</code> associated with the result of the request.
 	 * @throws IOException in case of errors
 	 */
-	public Response get(String url, Map<String, String> cookies) throws IOException {
-		Response response = Jsoup.connect(url).ignoreContentType(true).method(Method.GET).cookies(cookies).userAgent("Mozilla").execute();
-		cookies.putAll(response.cookies());
-		return response;
+	public Response get(String url, Map<String, String> cookies, String... data) throws IOException {
+		return execute(Method.GET, url, cookies, data);
 	}
 	
 	/**
-	 * Performs a POST HTTP call to the given URL with the given data. The data corresponds to key=value parameters and,
-	 * as such, needs to be an even number.
-	 * @param url URL to POST.
+	 * Performs a HTTP POST to the given URL.
+	 * @param url URL to POST to.
+	 * @param cookies Cookies to send with the request.
+	 * @param data POST parameters.
 	 * @return <code>Response</code> associated with the result of the request.
 	 * @throws IOException in case of errors
 	 */
 	public Response post(String url, Map<String, String> cookies, String... data) throws IOException {
-		Response response = Jsoup.connect(url).ignoreContentType(true).method(Method.POST).cookies(cookies).userAgent("Mozilla").data(data).execute();
+		return execute(Method.POST, url, cookies, data);
+	}
+
+	private Response execute(Method method, String url, Map<String, String> cookies, String... data) throws IOException {
+		Response response = Jsoup.connect(url).ignoreContentType(true).method(method).cookies(cookies).userAgent("Mozilla").data(data).execute();
 		cookies.putAll(response.cookies());
 		return response;
 	}
-
+	
 }
