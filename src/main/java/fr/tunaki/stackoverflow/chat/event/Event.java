@@ -1,66 +1,54 @@
 package fr.tunaki.stackoverflow.chat.event;
 
-import java.util.function.Function;
+import java.time.Instant;
 
 import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 
 /**
- * This class represents a chat event.
- * <p>An event is an action that happened in a room and contains a message. This class is final and cannot be instantiated, only
- * the pre-defined constants must be used.
+ * Base class for all events raised in chat.
+ * <p>An event represents an action that was triggered by a user or a system action. Actions made by user typically corresponds
+ * to posting messages, editing messages, etc. and actions made by the system typically corresponds to feeds added, change in 
+ * access level, etc.
+ * <p>All events have a instant at which they occured, represented by an {@link Instant} object (UTC). They also have the user that
+ * triggered the action (ID and display name). For system actions, the ID will be negative.  
  * @author Tunaki
- * @param <T> Type of the message for this event.
  */
-public final class Event<T> {
+public abstract class Event {
 	
-	/**
-	 * Event raised when a message is posted in a room.
-	 * This event only targets messages posted by users, and not system-generated messages (like adding a feed).
-	 * <p>All messages posted by users raise this event, even replies or mentions.
-	 */
-	public static final Event<MessagePostedEvent> MESSAGE_POSTED = new Event<>(MessagePostedEvent::new);
-	
-	/**
-	 * Event raised when a message is edited in a room.
-	 * <p>All messages posted by users and then edited raise this event, even replies or mentions.
-	 */
-	public static final Event<MessageEditedEvent> MESSAGE_EDITED = new Event<>(MessageEditedEvent::new);
-	
-	/**
-	 * Event raised when a reply is posted to the current logged-in user. A reply is a message targeting a specific other message.
-	 * In chat, this is the <code>:{messageId}</code> feature.
-	 * <p>When this event is raised, a corresponding {@link #MESSAGE_POSTED} or {@link #MESSAGE_EDITED} will be raised.
-	 * This event is still useful to listen specifically to replies of one's messages instead of all posted / edited messages.
-	 */
-	public static final Event<MessageReplyEvent> MESSAGE_REPLY = new Event<>(MessageReplyEvent::new);
-	
-	/**
-	 * Event raised when a mention of the current logged-in user is made. A mention is a message pinging a user without replying
-	 * to a specific message. In chat, this is the <code>@{username}</code> feature.
-	 * <p>When this event is raised, a corresponding {@link #MESSAGE_POSTED} or {@link #MESSAGE_EDITED} will be raised.
-	 * This event is still useful to listen specifically to mentions of the logged-in user instead of all posted / edited messages.
-	 */
-	public static final Event<UserMentionedEvent> USER_MENTIONED = new Event<>(UserMentionedEvent::new);
-	
-	private final Function<JsonElement, T> function;
-	
-	private T message;
-	
-	private Event(Function<JsonElement, T> function) {
-		this.function = function;
-	}
-	
-	Event<T> withData(JsonElement jsonElement) {
-		message = function.apply(jsonElement);
-		return this;
+	private Instant instant;
+	private long userId;
+	private String userName;
+
+	Event(JsonElement jsonElement) {
+		JsonObject jsonObject = jsonElement.getAsJsonObject();
+		instant = Instant.ofEpochSecond(jsonObject.get("time_stamp").getAsLong());
+		userId = jsonObject.get("user_id").getAsLong();
+		userName = jsonObject.get("user_name").getAsString();
 	}
 	
 	/**
-	 * Returns the message of this event.
-	 * @return Message of this event.
+	 * Returns the instant in time (UTC) at which this event occured.
+	 * @return Instant in time (UTC) at which this event occured.
 	 */
-	public T message() {
-		return message;
+	public Instant getInstant() {
+		return instant;
+	}
+
+	/**
+	 * Returns the id of the user that raised this event. For system generated event, the id will be negative.
+	 * @return Id of the user that raised this event.
+	 */
+	public long getUserId() {
+		return userId;
+	}
+
+	/**
+	 * Returns the display name of the user that raised this event.
+	 * @return Display name of the user that raised this event.
+	 */
+	public String getUserName() {
+		return userName;
 	}
 	
 }

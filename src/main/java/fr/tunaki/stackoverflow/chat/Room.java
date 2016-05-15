@@ -40,7 +40,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
-import fr.tunaki.stackoverflow.chat.event.Event;
+import fr.tunaki.stackoverflow.chat.event.EventType;
 import fr.tunaki.stackoverflow.chat.event.Events;
 
 public final class Room {
@@ -83,7 +83,7 @@ public final class Room {
 	};
 	
 	private Session websocketSession;
-	private Map<Event<Object>, List<Consumer<Object>>> chatEventListeners = new HashMap<>();
+	private Map<EventType<Object>, List<Consumer<Object>>> chatEventListeners = new HashMap<>();
 
 	private long roomId;
 	private String host;
@@ -167,7 +167,7 @@ public final class Room {
 		LOGGER.debug("Received message: " + json);
 		JsonObject jsonObject = new JsonParser().parse(json).getAsJsonObject();
 		jsonObject.entrySet().stream().filter(e -> e.getKey().equals("r" + roomId)).map(Map.Entry::getValue).map(JsonElement::getAsJsonObject).map(o -> o.get("e")).map(JsonElement::getAsJsonArray).findFirst().ifPresent(events -> { 
-			for (Event<?> event : Events.fromJsonData(events, roomId)) {
+			for (EventType<?> event : Events.fromJsonData(events, roomId)) {
 				for (Consumer<Object> listener : chatEventListeners.getOrDefault(event, Collections.emptyList())) {
 					listener.accept(event.message());
 				}
@@ -176,13 +176,13 @@ public final class Room {
 	}
 	
 	/**
-	 * Adds a listener for the given event. Valid events are defined as constants of the {@link Event} class.
+	 * Adds a listener for the given event. Valid events are defined as constants of the {@link EventType} class.
 	 * <p>All listeners bound to a specific event will be called when the corresponding event is raised.
 	 * @param event Event to listen to.
 	 * @param listener Listener to add to this event.
 	 */
-	public <T> void addEventListener(Event<T> event, Consumer<T> listener) {
-		@SuppressWarnings("unchecked") Event<Object> eventCast = (Event<Object>) event;
+	public <T> void addEventListener(EventType<T> event, Consumer<T> listener) {
+		@SuppressWarnings("unchecked") EventType<Object> eventCast = (EventType<Object>) event;
 		@SuppressWarnings("unchecked") Consumer<Object> listenerCast = (Consumer<Object>) listener;
 		chatEventListeners.computeIfAbsent(eventCast, e -> new ArrayList<>()).add(listenerCast);
 	}
@@ -325,17 +325,23 @@ public final class Room {
 		StackExchangeClient client = new StackExchangeClient(properties.getProperty("email"), properties.getProperty("password"));
 		try {
 			CountDownLatch countDownLatch = new CountDownLatch(1);
-			Room room = client.joinRoom("stackoverflow.com", 111347);
+			Room room = client.joinRoom("stackoverflow.com", 68414);
 //			Room room2 = client.joinRoom("stackoverflow.com", 95290);
-			room.addEventListener(Event.MESSAGE_POSTED, e -> {
+			room.addEventListener(EventType.MESSAGE_POSTED, e -> {
 				System.out.println(e);
 				if (e.getContent().equals("die")) {
 					countDownLatch.countDown();
 				}
 			});
-			room.addEventListener(Event.MESSAGE_EDITED, System.out::println);
-			room.addEventListener(Event.MESSAGE_REPLY, System.out::println);
-			room.addEventListener(Event.USER_MENTIONED, System.out::println);
+			room.addEventListener(EventType.MESSAGE_EDITED, System.out::println);
+			room.addEventListener(EventType.MESSAGE_REPLY, System.out::println);
+			room.addEventListener(EventType.USER_MENTIONED, System.out::println);
+			room.addEventListener(EventType.USER_ENTERED, e -> {
+				System.out.println(e.getInstant() + " " + e.getUserId() + " " + e.getUserName());
+			});
+			room.addEventListener(EventType.USER_LEFT, e -> {
+				System.out.println(e.getInstant() + " " + e.getUserId() + " " + e.getUserName());
+			});
 //			room2.addEventListener(Event.MESSAGE_POSTED, e -> {
 //				room2.replyTo(e.getMessageId(), "blob");
 //				System.out.println(e);
