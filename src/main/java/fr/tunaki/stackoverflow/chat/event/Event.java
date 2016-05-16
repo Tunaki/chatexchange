@@ -3,6 +3,7 @@ package fr.tunaki.stackoverflow.chat.event;
 import java.time.Instant;
 import java.util.function.Function;
 import java.util.function.ToIntFunction;
+import java.util.function.ToLongFunction;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -59,6 +60,10 @@ public abstract class Event {
 	
 	protected int orDefault(JsonElement element, int defaultValue, ToIntFunction<JsonElement> function) {
 		return element == null ? defaultValue : function.applyAsInt(element);
+	}
+	
+	protected long orDefault(JsonElement element, long defaultValue, ToLongFunction<JsonElement> function) {
+		return element == null ? defaultValue : function.applyAsLong(element);
 	}
 	
 	protected boolean orDefault(JsonElement element, boolean defaultValue) {
