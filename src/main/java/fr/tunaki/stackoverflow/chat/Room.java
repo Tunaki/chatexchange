@@ -10,16 +10,18 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.websocket.ClientEndpointConfig;
 import javax.websocket.ClientEndpointConfig.Builder;
@@ -45,54 +47,25 @@ import fr.tunaki.stackoverflow.chat.event.EventType;
 import fr.tunaki.stackoverflow.chat.event.Events;
 
 public final class Room {
-	
+
 	private static final Logger LOGGER = LoggerFactory.getLogger(Room.class);
 
 	private static final String SUCCESS = "ok";
-	private static final int THROTTLE_MS = 10000;
+	private static final Pattern TRY_AGAIN_PATTERN = Pattern.compile("You can perform this action again in (\\d+) seconds");
+	private static final int NUMBER_OF_RETRIES_ON_THROTTLE = 5;
 
 	private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
 
-	private Executor messageEventExecutor = new Executor() {
-
-		private final Semaphore semaphore = new Semaphore(1);
-		private long lastEndTime = 0;
-
-		@Override
-		public void execute(Runnable command) {
-			boolean acquired = false;
-			do {
-				try {
-					semaphore.acquire();
-					acquired = true;
-				} catch (InterruptedException e) { }
-			} while (!acquired);
-			long timeBetweenLastCall = System.currentTimeMillis() - lastEndTime;
-			if (timeBetweenLastCall < THROTTLE_MS) {
-				try {
-					Thread.sleep(THROTTLE_MS - timeBetweenLastCall);
-				} catch (InterruptedException e) { }
-			}
-			try {
-				command.run();
-			} finally {
-				lastEndTime = System.currentTimeMillis();
-				semaphore.release();
-			}
-		}
-
-	};
-	
 	private Session websocketSession;
 	private Map<EventType<Object>, List<Consumer<Object>>> chatEventListeners = new HashMap<>();
 
 	private long roomId;
 	private String host;
 	private String fkey;
-	
+
 	private HttpClient httpClient;
 	private Map<String, String> cookies;
-	
+
 	private boolean hasLeft = false;
 
 	Room(String host, long roomId, HttpClient httpClient, Map<String, String> cookies) {
@@ -106,14 +79,33 @@ public final class Room {
 	}
 
 	private JsonElement post(String url, String... data) {
+		return post(NUMBER_OF_RETRIES_ON_THROTTLE, url, data);
+	}
+	
+	private JsonElement post(int retryCount, String url, String... data) {
+		Response response;
 		try {
-			Response response = httpClient.post(url, cookies, withFkey(data));
-			return new JsonParser().parse(response.body());
+			response = httpClient.postIgnoringErrors(url, cookies, withFkey(data));
 		} catch (IOException e) {
 			throw new ChatOperationException(e);
 		}
+		String body = response.body();
+		if (response.statusCode() == 200) {
+			return new JsonParser().parse(body);
+		}
+		Matcher matcher = TRY_AGAIN_PATTERN.matcher(body);
+		if (retryCount > 0 && matcher.find()) {
+			int throttle = Integer.parseInt(matcher.group(1));
+			LOGGER.debug("Tried to POST to URL {} with data {} but was throttled, retrying in {} seconds", url, data, throttle);
+			try {
+				Thread.sleep(1000 * throttle);
+			} catch (InterruptedException e) { }
+			return post(retryCount - 1, url, data);
+		} else {
+			throw new ChatOperationException("The chat operation failed with the message: " + body);
+		}
 	}
-	
+
 	private String[] withFkey(String[] data) {
 		String[] dataWithFKey = new String[data.length + 2];
 		dataWithFKey[0] = "fkey";
@@ -132,53 +124,53 @@ public final class Room {
 			throw new ChatOperationException(e);
 		}
 	}
-	
+
 	private void startWebsocket() {
 		String websocketUrl = post("http://chat." + host + "/ws-auth", "roomid", String.valueOf(roomId)).getAsJsonObject().get("url").getAsString();
 		String time = post("http://chat." + host + "/chats/" + roomId + "/events").getAsJsonObject().get("time").getAsString();
-        ClientManager client = ClientManager.createClient(JdkClientContainer.class.getName());
-        Builder configBuilder = ClientEndpointConfig.Builder.create();
-        configBuilder.configurator(new Configurator() {
-        	@Override
-        	public void beforeRequest(Map<String, List<String>> headers) {
-                headers.put("Origin", Arrays.asList("http://chat." + host));
-        	}
-        });
-        websocketUrl = websocketUrl + "?l=" + time;
-        LOGGER.debug("Connecting to chat websocket " + websocketUrl);
-        try {
-        	websocketSession = client.connectToServer(new Endpoint() {
-			    @Override
-			    public void onOpen(Session session, EndpointConfig config) {
-			        session.addMessageHandler(new MessageHandler.Whole<String>() {
-			        	@Override
-			            public void onMessage(String message) {
-			            	handleChatEvent(message);
-			            }
-			        });
-			    }
-			    @Override
-			    public void onError(Session session, Throwable thr) {
-			    	LOGGER.error("An error occured during the processing of a message", thr);
-			    }
+		ClientManager client = ClientManager.createClient(JdkClientContainer.class.getName());
+		Builder configBuilder = ClientEndpointConfig.Builder.create();
+		configBuilder.configurator(new Configurator() {
+			@Override
+			public void beforeRequest(Map<String, List<String>> headers) {
+				headers.put("Origin", Arrays.asList("http://chat." + host));
+			}
+		});
+		websocketUrl += "?l=" + time;
+		LOGGER.debug("Connecting to chat websocket " + websocketUrl);
+		try {
+			websocketSession = client.connectToServer(new Endpoint() {
+				@Override
+				public void onOpen(Session session, EndpointConfig config) {
+					session.addMessageHandler(new MessageHandler.Whole<String>() {
+						@Override
+						public void onMessage(String message) {
+							handleChatEvent(message);
+						}
+					});
+				}
+				@Override
+				public void onError(Session session, Throwable thr) {
+					LOGGER.error("An error occured during the processing of a message", thr);
+				}
 			}, configBuilder.build(), new URI(websocketUrl));
-		} catch (DeploymentException | IOException | URISyntaxException e) {
+		} catch (DeploymentException | URISyntaxException | IOException e) {
 			throw new ChatOperationException("Cannot connect to chat websocket", e);
 		}
 	}
-	
+
 	private void handleChatEvent(String json) {
 		LOGGER.debug("Received message: " + json);
 		JsonObject jsonObject = new JsonParser().parse(json).getAsJsonObject();
-		jsonObject.entrySet().stream().filter(e -> e.getKey().equals("r" + roomId)).map(Map.Entry::getValue).map(JsonElement::getAsJsonObject).map(o -> o.get("e")).map(JsonElement::getAsJsonArray).findFirst().ifPresent(events -> { 
+		jsonObject.entrySet().stream().filter(e -> e.getKey().equals("r" + roomId)).map(Map.Entry::getValue).map(JsonElement::getAsJsonObject).map(o -> o.get("e")).filter(Objects::nonNull).map(JsonElement::getAsJsonArray).findFirst().ifPresent(events -> {
 			for (Event event : Events.fromJsonData(events, roomId)) {
 				for (Consumer<Object> listener : chatEventListeners.getOrDefault(EventType.fromEvent(event), Collections.emptyList())) {
-					listener.accept(event);
+					executor.submit(() -> listener.accept(event));
 				}
 			}
 		});
 	}
-	
+
 	/**
 	 * Adds a listener for the given event. Valid events are defined as constants of the {@link EventType} class.
 	 * <p>All listeners bound to a specific event will be called when the corresponding event is raised.
@@ -190,6 +182,13 @@ public final class Room {
 		@SuppressWarnings("unchecked") Consumer<Object> listenerCast = (Consumer<Object>) listener;
 		chatEventListeners.computeIfAbsent(eventCast, e -> new ArrayList<>()).add(listenerCast);
 	}
+	
+	private <T> CompletableFuture<T> supplyAsync(Supplier<T> supplier) {
+		return CompletableFuture.supplyAsync(supplier, executor).whenComplete((res, thr) -> {
+			if (res != null) LOGGER.trace("Task completed successfully with result: " + res);
+			if (thr != null) LOGGER.error("Couldn't execute task", thr);
+		});
+	}
 
 	/**
 	 * Sends the given message asynchronously.
@@ -198,14 +197,13 @@ public final class Room {
 	 */
 	public CompletableFuture<Long> send(String message) {
 		LOGGER.info("Task added - sending message '{}' to room {}.", message, roomId);
-		Supplier<Long> supplier = () -> {
+		return supplyAsync(() -> {
 			JsonElement element = post("http://chat." + host + "/chats/" + roomId + "/messages/new", "text", message);
 			LOGGER.debug("Message '{}' sent to room {}, raw result: {}", message, roomId, element);
 			return element.getAsJsonObject().get("id").getAsLong();
-		};
-		return CompletableFuture.supplyAsync(supplier, messageEventExecutor);
+		});
 	}
-	
+
 	/**
 	 * Sends a reply message to the given message id.
 	 * @param messageId Id of the message to reply to.
@@ -217,22 +215,22 @@ public final class Room {
 	}
 
 	/**
-	 * Edits asynchronously the message having the given id with the new given content.
+	 * Edits asynchronously the message having the given id with the new given
+	 * content.
 	 * @param messageId Id of the message to edit.
 	 * @param message New content of the message.
 	 * @return A future holding no value.
 	 */
 	public CompletableFuture<Void> edit(long messageId, String message) {
 		LOGGER.info("Task added - editing message {} in room {}.", messageId, roomId);
-		Supplier<Void> supplier = () -> {
+		return supplyAsync(() -> {
 			String result = post("http://chat." + host + "/messages/" + messageId, "text", message).getAsString();
 			LOGGER.debug("Message {} edited to '{}' in room {}, raw result: {}", messageId, message, roomId, result);
 			if (!SUCCESS.equals(result)) {
 				throw new ChatOperationException("Cannot edit message " + messageId + ". Reason: " + result);
 			}
 			return null;
-		};
-		return CompletableFuture.supplyAsync(supplier, messageEventExecutor);
+		});
 	}
 
 	/**
@@ -242,43 +240,40 @@ public final class Room {
 	 */
 	public CompletableFuture<Void> delete(long messageId) {
 		LOGGER.info("Task added - deleting message {} in room {}.", messageId, roomId);
-		Supplier<Void> supplier = () -> {
+		return supplyAsync(() -> {
 			String result = post("http://chat." + host + "/messages/" + messageId + "/delete").getAsString();
 			LOGGER.debug("Message {} deleted in room {}, raw result: {}", messageId, roomId, result);
 			if (!SUCCESS.equals(result)) {
 				throw new ChatOperationException("Cannot delete message " + messageId + ". Reason: " + result);
 			}
 			return null;
-		};
-		return CompletableFuture.supplyAsync(supplier, messageEventExecutor);
+		});
 	}
 
 	public CompletableFuture<Void> toggleStar(long messageId) {
 		LOGGER.info("Task added - starring/unstarring message {} in room {}.", messageId, roomId);
-		Supplier<Void> supplier = () -> {
+		return supplyAsync(() -> {
 			String result = post("http://chat." + host + "/messages/" + messageId + "/star").getAsString();
 			LOGGER.debug("Message {} starred/unstarred in room {}, raw result: {}", messageId, roomId, result);
 			if (!SUCCESS.equals(result)) {
 				throw new ChatOperationException("Cannot star/unstar message " + messageId + ". Reason: " + result);
 			}
 			return null;
-		};
-		return CompletableFuture.supplyAsync(supplier, messageEventExecutor);
+		});
 	}
 
 	public CompletableFuture<Void> togglePin(long messageId) {
 		LOGGER.info("Task added - pining/unpining message {} in room {}.", messageId, roomId);
-		Supplier<Void> supplier = () -> {
+		return supplyAsync(() -> {
 			String result = post("http://chat." + host + "/messages/" + messageId + "/owner-star").getAsString();
 			LOGGER.debug("Message {} pined/unpined in room {}, raw result: {}", messageId, roomId, result);
 			if (!SUCCESS.equals(result)) {
 				throw new ChatOperationException("Cannot pin/unpin message " + messageId + ". Reason: " + result);
 			}
 			return null;
-		};
-		return CompletableFuture.supplyAsync(supplier, messageEventExecutor);
+		});
 	}
-	
+
 	/**
 	 * Causes the current logged user to leave the room.
 	 * <p>Calling this method multiple times has no effect.
@@ -292,8 +287,10 @@ public final class Room {
 	}
 
 	/**
-	 * Returns the id of this room. This id needs to be combined with the host of this room to reference uniquely this room, 
-	 * as there can be rooms with the same id across multiple hosts.
+	 * Returns the id of this room. This id needs to be combined with the host
+	 * of this room to reference uniquely this room, as there can be rooms with
+	 * the same id across multiple hosts.
+	 * 
 	 * @return Id of this room.
 	 */
 	public long getRoomId() {
@@ -301,7 +298,9 @@ public final class Room {
 	}
 
 	/**
-	 * Returns the host of this room. Values are <code>stackoverflow.com</code>, <code>stackexchange.com</code> and <code>meta.stackexchange.com</code>
+	 * Returns the host of this room. Values are <code>stackoverflow.com</code>,
+	 * <code>stackexchange.com</code> and <code>meta.stackexchange.com</code>
+	 * 
 	 * @return Host of this room.
 	 */
 	public String getHost() {
@@ -309,13 +308,17 @@ public final class Room {
 	}
 
 	void close() {
+		shutdown(executor);
+		try {
+			websocketSession.close();
+		} catch (IOException e) { }
+	}
+	
+	private void shutdown(ExecutorService executor) {
 		executor.shutdown();
 		try {
 			while (!executor.awaitTermination(5, TimeUnit.SECONDS));
 		} catch (InterruptedException e) { }
-		try {
-			websocketSession.close();
-		} catch (IOException e) { }
 	}
 
 	public static void main(String[] args) {
@@ -336,30 +339,24 @@ public final class Room {
 					countDownLatch.countDown();
 				}
 			});
-			room2.addEventListener(EventType.MESSAGE_POSTED, e -> {
-				if (e.getContent().equals("die")) {
-					countDownLatch.countDown();
-				}
-			});
-			room.addEventListener(EventType.USER_MENTIONED, e -> {
-				System.out.println(e.getMessageId() + " - " + e.getContent());
-			});
-			room2.addEventListener(EventType.USER_MENTIONED, e -> {
-				System.out.println(e.getMessageId() + " - " + e.getContent());
-			});
+			room.addEventListener(EventType.MESSAGE_REPLY, e -> room.replyTo(e.getMessageId(), "Blob"));
+			room2.addEventListener(EventType.MESSAGE_REPLY, e -> room2.replyTo(e.getMessageId(), "Blob"));
 			try {
 				countDownLatch.await();
-			} catch (InterruptedException e1) { }
-//			CompletableFuture.allOf(room.send("TUNAKI ROCKS")).join();
+			} catch (InterruptedException e1) {
+			}
+			// CompletableFuture.allOf(room.send("TUNAKI ROCKS")).join();
 		} finally {
 			client.close();
 		}
-//		Room room2 = client.joinRoom("stackoverflow.com", 108192);
-//		try {
-//			CompletableFuture.allOf(IntStream.range(0, 20).mapToObj(i -> (i % 2 == 0 ? room :room2).send("Blob blob blob " + i)).toArray(CompletableFuture[]::new)).join();
-//		} finally {
-//			client.close();
-//		}
+		// Room room2 = client.joinRoom("stackoverflow.com", 108192);
+		// try {
+		// CompletableFuture.allOf(IntStream.range(0, 20).mapToObj(i -> (i % 2
+		// == 0 ? room :room2).send("Blob blob blob " +
+		// i)).toArray(CompletableFuture[]::new)).join();
+		// } finally {
+		// client.close();
+		// }
 	}
 
 }
