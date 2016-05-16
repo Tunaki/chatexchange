@@ -22,7 +22,7 @@ public final class Events {
 	 * @param roomId Id of the room to return events from.
 	 * @return List of events with their data.
 	 */
-	public static List<EventType<?>> fromJsonData(JsonArray events, long roomId) {
+	public static List<Event> fromJsonData(JsonArray events, long roomId) {
 		//TODO: special trickery for 2 event types meaning a single real event, like kicking or adding as RO
 		return StreamSupport.stream(events.spliterator(), false)
 				.map(JsonElement::getAsJsonObject)
@@ -32,16 +32,16 @@ public final class Events {
 					switch (eventType) {
 					case 1:
 						if (object.get("user_id").getAsLong() > 0) {
-							return EventType.MESSAGE_POSTED.withData(object);
+							return new MessagePostedEvent(object);
 						}
 						return null;
-					case 2: return EventType.MESSAGE_EDITED.withData(object);
-					case 3: return EventType.USER_ENTERED.withData(object);
-					case 4: return EventType.USER_LEFT.withData(object);
-					case 6: return EventType.MESSAGE_STARRED.withData(object);
-					case 10: return EventType.MESSAGE_DELETED.withData(object);
-					case 8: return EventType.USER_MENTIONED.withData(object);
-					case 18: return EventType.MESSAGE_REPLY.withData(object);
+					case 2: return new MessageEditedEvent(object);
+					case 3: return new UserEnteredEvent(object);
+					case 4: return new UserLeftEvent(object);
+					case 6: return new MessageStarredEvent(object);
+					case 10: return new MessageDeletedEvent(object);
+					case 8: return new UserMentionedEvent(object);
+					case 18: return new MessageReplyEvent(object);
 					default:
 						return null;
 					}

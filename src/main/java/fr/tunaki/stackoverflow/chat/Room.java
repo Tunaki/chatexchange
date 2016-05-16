@@ -40,6 +40,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
+import fr.tunaki.stackoverflow.chat.event.Event;
 import fr.tunaki.stackoverflow.chat.event.EventType;
 import fr.tunaki.stackoverflow.chat.event.Events;
 
@@ -170,9 +171,9 @@ public final class Room {
 		LOGGER.debug("Received message: " + json);
 		JsonObject jsonObject = new JsonParser().parse(json).getAsJsonObject();
 		jsonObject.entrySet().stream().filter(e -> e.getKey().equals("r" + roomId)).map(Map.Entry::getValue).map(JsonElement::getAsJsonObject).map(o -> o.get("e")).map(JsonElement::getAsJsonArray).findFirst().ifPresent(events -> { 
-			for (EventType<?> event : Events.fromJsonData(events, roomId)) {
-				for (Consumer<Object> listener : chatEventListeners.getOrDefault(event, Collections.emptyList())) {
-					listener.accept(event.message());
+			for (Event event : Events.fromJsonData(events, roomId)) {
+				for (Consumer<Object> listener : chatEventListeners.getOrDefault(EventType.fromEvent(event), Collections.emptyList())) {
+					listener.accept(event);
 				}
 			}
 		});
@@ -329,31 +330,23 @@ public final class Room {
 		try {
 			CountDownLatch countDownLatch = new CountDownLatch(1);
 			Room room = client.joinRoom("stackoverflow.com", 111347);
-//			Room room2 = client.joinRoom("stackoverflow.com", 95290);
+			Room room2 = client.joinRoom("stackoverflow.com", 95290);
 			room.addEventListener(EventType.MESSAGE_POSTED, e -> {
-				System.out.println(e);
 				if (e.getContent().equals("die")) {
 					countDownLatch.countDown();
 				}
 			});
-			room.addEventListener(EventType.MESSAGE_EDITED, System.out::println);
-			room.addEventListener(EventType.MESSAGE_REPLY, System.out::println);
-			room.addEventListener(EventType.USER_MENTIONED, System.out::println);
-			room.addEventListener(EventType.USER_ENTERED, e -> {
-				System.out.println(e.getInstant() + " " + e.getUserId() + " " + e.getUserName());
+			room2.addEventListener(EventType.MESSAGE_POSTED, e -> {
+				if (e.getContent().equals("die")) {
+					countDownLatch.countDown();
+				}
 			});
-			room.addEventListener(EventType.USER_LEFT, e -> {
-				System.out.println(e.getInstant() + " " + e.getUserId() + " " + e.getUserName());
+			room.addEventListener(EventType.USER_MENTIONED, e -> {
+				System.out.println(e.getMessageId() + " - " + e.getContent());
 			});
-			room.addEventListener(EventType.MESSAGE_STARRED, e -> {
-				System.out.println(e.getStarCount() + " " + e.getPinCount());
+			room2.addEventListener(EventType.USER_MENTIONED, e -> {
+				System.out.println(e.getMessageId() + " - " + e.getContent());
 			});
-			room.addEventListener(EventType.MESSAGE_DELETED, System.out::println);
-//			room2.addEventListener(Event.MESSAGE_POSTED, e -> {
-//				room2.replyTo(e.getMessageId(), "blob");
-//				System.out.println(e);
-//				countDownLatch.countDown();
-//			});
 			try {
 				countDownLatch.await();
 			} catch (InterruptedException e1) { }
