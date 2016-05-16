@@ -34,6 +34,7 @@ import javax.websocket.Session;
 import org.glassfish.tyrus.client.ClientManager;
 import org.glassfish.tyrus.container.jdk.client.JdkClientContainer;
 import org.jsoup.Connection.Response;
+import org.jsoup.nodes.Document;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -279,12 +280,50 @@ public final class Room {
 		close();
 		hasLeft = true;
 	}
+	
+	/**
+	 * Retrieves the {@link Message} having the given id.
+	 * @param messageId Id of the message to fetch.
+	 * @return Message with the given id.
+	 */
+	public Message getMessage(long messageId) {
+		try {
+			String plainContent = httpClient.get("http://chat." + host + "/message/" + messageId, cookies, "fkey", fkey, "plain", "true").parse().body().html();
+			String content = httpClient.get("http://chat." + host + "/message/" + messageId, cookies, "fkey", fkey, "plain", "false").parse().body().html();
+			Document documentHistory = httpClient.get("http://chat." + host + "/messages/" + messageId + "/history", cookies, "fkey", fkey).parse();
+			User user = getUser(Long.parseLong(documentHistory.select(".username > a").first().attr("href").split("/")[2]));
+			boolean deleted = documentHistory.select(".message .content").stream().anyMatch(e -> e.getElementsByTag("b").html().equals("deleted"));
+			return new Message(messageId, user, plainContent, content, deleted);
+		} catch (IOException e) {
+			throw new ChatOperationException(e);
+		}
+		
+	}
+	
+	/**
+	 * Retrieves the {@link User} having the given id.
+	 * @param messageId Id of the user to fetch.
+	 * @return User with the given id.
+	 */
+	public User getUser(long userId) {
+		Document document;
+		try {
+			document = httpClient.get("http://chat." + host + "/users/" + userId, cookies).parse();
+		} catch (IOException e) {
+			throw new ChatOperationException(e);
+		}
+		String userName = document.getElementsByClass("user-status").html().replace('\u2666', ' ').replace("&nbsp;", "").trim();
+		String title = document.getElementsByClass("reputation-score").attr("title");
+		int reputation = title.isEmpty() ? 0 : Integer.parseInt(title);
+		boolean moderator = document.getElementsByClass("user-status").html().contains("\u2666");
+		boolean roomOwner = document.getElementsByClass("roomcard").stream().anyMatch(e -> e.id().equals("room-" + roomId));
+		return new User(userId, userName, reputation, moderator, roomOwner);
+	}
 
 	/**
 	 * Returns the id of this room. This id needs to be combined with the host
 	 * of this room to reference uniquely this room, as there can be rooms with
 	 * the same id across multiple hosts.
-	 * 
 	 * @return Id of this room.
 	 */
 	public long getRoomId() {
@@ -327,18 +366,29 @@ public final class Room {
 		try {
 			CountDownLatch countDownLatch = new CountDownLatch(1);
 			Room room = client.joinRoom("stackoverflow.com", 111347);
-			Room room2 = client.joinRoom("stackoverflow.com", 95290);
-			room.addEventListener(EventType.MESSAGE_POSTED, e -> {
-				if (e.getContent().equals("die")) {
-					countDownLatch.countDown();
-				}
-			});
-			room.addEventListener(EventType.MESSAGE_REPLY, e -> room.replyTo(e.getMessageId(), "Blob"));
-			room2.addEventListener(EventType.MESSAGE_REPLY, e -> room2.replyTo(e.getMessageId(), "Blob"));
-			try {
-				countDownLatch.await();
-			} catch (InterruptedException e1) {
-			}
+			Message message = room.getMessage(30419591);
+			System.out.println(message.getId());
+			System.out.println(message.getContent());
+			System.out.println(message.getPlainContent());
+			System.out.println(message.isDeleted());
+			System.out.println(message.getUser().getId());
+			System.out.println(message.getUser().getName());
+			System.out.println(message.getUser().getReputation());
+			System.out.println(message.getUser().isModerator());
+			System.out.println(message.getUser().isRoomOwner());
+			
+//			Room room2 = client.joinRoom("stackoverflow.com", 95290);
+//			room.addEventListener(EventType.MESSAGE_POSTED, e -> {
+//				if (e.getContent().equals("die")) {
+//					countDownLatch.countDown();
+//				}
+//			});
+//			room.addEventListener(EventType.MESSAGE_REPLY, e -> room.replyTo(e.getMessageId(), "Blob"));
+//			room2.addEventListener(EventType.MESSAGE_REPLY, e -> room2.replyTo(e.getMessageId(), "Blob"));
+//			try {
+//				countDownLatch.await();
+//			} catch (InterruptedException e1) {
+//			}
 			// CompletableFuture.allOf(room.send("TUNAKI ROCKS")).join();
 		} finally {
 			client.close();
