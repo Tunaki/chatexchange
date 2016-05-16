@@ -52,7 +52,7 @@ class HttpClient {
 	}
 
 	private Response execute(Method method, String url, Map<String, String> cookies, boolean ignoreErrors, String... data) throws IOException {
-		Response response = Jsoup.connect(url).ignoreContentType(true).ignoreHttpErrors(ignoreErrors).method(method).cookies(cookies).userAgent("Mozilla").data(data).execute();
+		Response response = Jsoup.connect(url).timeout(0).ignoreContentType(true).ignoreHttpErrors(ignoreErrors).method(method).cookies(cookies).userAgent("Mozilla").data(data).execute();
 		cookies.putAll(response.cookies());
 		return response;
 	}
