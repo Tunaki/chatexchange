@@ -29,7 +29,6 @@ import javax.websocket.ClientEndpointConfig.Configurator;
 import javax.websocket.DeploymentException;
 import javax.websocket.Endpoint;
 import javax.websocket.EndpointConfig;
-import javax.websocket.MessageHandler;
 import javax.websocket.Session;
 
 import org.glassfish.tyrus.client.ClientManager;
@@ -142,12 +141,7 @@ public final class Room {
 			websocketSession = client.connectToServer(new Endpoint() {
 				@Override
 				public void onOpen(Session session, EndpointConfig config) {
-					session.addMessageHandler(new MessageHandler.Whole<String>() {
-						@Override
-						public void onMessage(String message) {
-							handleChatEvent(message);
-						}
-					});
+					session.addMessageHandler(String.class, Room.this::handleChatEvent);
 				}
 				@Override
 				public void onError(Session session, Throwable thr) {
