@@ -26,7 +26,7 @@ public abstract class Event {
 	Event(JsonElement jsonElement) {
 		JsonObject jsonObject = jsonElement.getAsJsonObject();
 		instant = Instant.ofEpochSecond(jsonObject.get("time_stamp").getAsLong());
-		userId = jsonObject.get("user_id").getAsLong();
+		userId = orDefault(jsonObject.get("user_id"), 0, JsonElement::getAsLong);
 		userName = orDefault(jsonObject.get("user_name"), null, JsonElement::getAsString);
 	}
 	
@@ -39,7 +39,9 @@ public abstract class Event {
 	}
 
 	/**
-	 * Returns the id of the user that raised this event. For system generated event, the id will be negative.
+	 * Returns the id of the user that raised this event.
+	 * <p>For system generated event, the id will be strictly negative. For events where there was
+	 * no registered user, this will be 0.
 	 * @return Id of the user that raised this event.
 	 */
 	public long getUserId() {
