@@ -14,7 +14,8 @@ import com.google.gson.JsonObject;
  * to posting messages, editing messages, etc. and actions made by the system typically corresponds to feeds added, change in 
  * access level, etc.
  * <p>All events have a instant at which they occured, represented by an {@link Instant} object (UTC). They also have the user that
- * triggered the action (ID and display name). For system actions, the ID will be negative.  
+ * triggered the action (ID and display name), with the exception of anonymous events (like starring).
+ * For system events, the ID will be strictly negative and for anonymous events, it is will be 0.  
  * @author Tunaki
  */
 public abstract class Event {
