@@ -55,6 +55,7 @@ public final class Room {
 	private static final int NUMBER_OF_RETRIES_ON_THROTTLE = 5;
 
 	private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
+	private final ExecutorService eventExecutor = Executors.newCachedThreadPool();
 
 	private Session websocketSession;
 	private Map<EventType<Object>, List<Consumer<Object>>> chatEventListeners = new HashMap<>();
@@ -160,7 +161,7 @@ public final class Room {
 		jsonObject.entrySet().stream().filter(e -> e.getKey().equals("r" + roomId)).map(Map.Entry::getValue).map(JsonElement::getAsJsonObject).map(o -> o.get("e")).filter(Objects::nonNull).map(JsonElement::getAsJsonArray).findFirst().ifPresent(events -> {
 			for (Event event : Events.fromJsonData(events, roomId)) {
 				for (Consumer<Object> listener : chatEventListeners.getOrDefault(EventType.fromEvent(event), Collections.emptyList())) {
-					executor.submit(() -> listener.accept(event));
+					eventExecutor.submit(() -> listener.accept(event));
 				}
 			}
 		});
@@ -342,6 +343,7 @@ public final class Room {
 
 	void close() {
 		shutdown(executor);
+		shutdown(eventExecutor);
 		try {
 			websocketSession.close();
 		} catch (IOException e) { }
