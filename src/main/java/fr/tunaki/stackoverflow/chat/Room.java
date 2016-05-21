@@ -211,13 +211,12 @@ public final class Room {
 	}
 
 	/**
-	 * Edits asynchronously the message having the given id with the new given
-	 * content.
+	 * Edits asynchronously the message having the given id with the new given content.
 	 * @param messageId Id of the message to edit.
 	 * @param message New content of the message.
-	 * @return A future holding no value.
+	 * @return A future holding the id of the edited message (which is the same as the given message id).
 	 */
-	public CompletableFuture<Void> edit(long messageId, String message) {
+	public CompletableFuture<Long> edit(long messageId, String message) {
 		LOGGER.info("Task added - editing message {} in room {}.", messageId, roomId);
 		return supplyAsync(() -> {
 			String result = post("http://chat." + host + "/messages/" + messageId, "text", message).getAsString();
@@ -225,7 +224,7 @@ public final class Room {
 			if (!SUCCESS.equals(result)) {
 				throw new ChatOperationException("Cannot edit message " + messageId + ". Reason: " + result);
 			}
-			return null;
+			return messageId;
 		});
 	}
 
