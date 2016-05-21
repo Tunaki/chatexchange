@@ -4,6 +4,10 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.time.LocalTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -53,6 +57,8 @@ public final class Room {
 	private static final String SUCCESS = "ok";
 	private static final Pattern TRY_AGAIN_PATTERN = Pattern.compile("You can perform this action again in (\\d+) seconds");
 	private static final int NUMBER_OF_RETRIES_ON_THROTTLE = 5;
+	private static final DateTimeFormatter MESSAGE_TIME_FORMATTER = DateTimeFormatter.ofPattern("hh:mm a").withZone(ZoneOffset.UTC);
+	private static final int EDIT_WINDOW_SECONDS = 115;
 
 	private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
 	private final ExecutorService eventExecutor = Executors.newCachedThreadPool();
@@ -227,6 +233,25 @@ public final class Room {
 			return messageId;
 		});
 	}
+	
+	/**
+	 * Returns whether this message can be edited as of now. This doesn't guarantee that a subsequent call to {@link #edit(long, String)}
+	 * will be successful, because the time window allowed for the edit could have been passed by then. However, if a call to
+	 * {@link #edit(long, String)} is made right after this method returns <code>true</code> then it is very likely to succeed
+	 * (i.e. not fail because the edit window has elapsed; it can still fail for other reasons).
+	 * <p>A message can be edited if it has been posted less than {@value #EDIT_WINDOW_SECONDS} seconds ago.
+	 * @param messageId Id of the message.
+	 * @return <code>true</code> if the given message can be edited right now, <code>false</code> otherwise.
+	 */
+	public boolean isEditable(long messageId) {
+		try {
+			Document documentHistory = httpClient.get("http://chat." + host + "/messages/" + messageId + "/history", cookies, "fkey", fkey).parse();
+			LocalTime time = LocalTime.parse(documentHistory.getElementsByClass("timestamp").last().html(), MESSAGE_TIME_FORMATTER);
+			return ChronoUnit.SECONDS.between(time, LocalTime.now(ZoneOffset.UTC)) < EDIT_WINDOW_SECONDS;
+		} catch (IOException e) {
+			throw new ChatOperationException(e);
+		}
+	}
 
 	/**
 	 * Deletes asynchronously the message having the given id.
@@ -367,17 +392,26 @@ public final class Room {
 		try {
 			CountDownLatch countDownLatch = new CountDownLatch(1);
 			Room room = client.joinRoom("stackoverflow.com", 111347);
-			Message message = room.getMessage(30419591);
-			System.out.println(message.getId());
-			System.out.println(message.getContent());
-			System.out.println(message.getPlainContent());
-			System.out.println(message.isDeleted());
-			System.out.println(message.getUser().getId());
-			System.out.println(message.getUser().getName());
-			System.out.println(message.getUser().getReputation());
-			System.out.println(message.getUser().isModerator());
-			System.out.println(message.getUser().isRoomOwner());
 			
+			room.addEventListener(EventType.MESSAGE_POSTED, m -> {
+				System.out.println("Message posted");
+				if (m.getContent().equals("die")) {
+					countDownLatch.countDown();
+				} else {
+					System.out.println(room.isEditable(30690260));
+				}
+			});
+			
+//			CompletableFuture<Long> sentId = room.send("");
+//			sentId.thenAccept(messageId -> {
+//				room.edit(messageId, "blob")
+//				.handleAsync((mId, thr) -> {
+//					if (thr != null) return room.replyTo(messageId, "blob").join();
+//					return mId;
+//				})
+//				.thenAccept(mId -> System.out.println(mId));
+//				});
+						
 //			Room room2 = client.joinRoom("stackoverflow.com", 95290);
 //			room.addEventListener(EventType.MESSAGE_POSTED, e -> {
 //				if (e.getContent().equals("die")) {
@@ -386,10 +420,10 @@ public final class Room {
 //			});
 //			room.addEventListener(EventType.MESSAGE_REPLY, e -> room.replyTo(e.getMessageId(), "Blob"));
 //			room2.addEventListener(EventType.MESSAGE_REPLY, e -> room2.replyTo(e.getMessageId(), "Blob"));
-//			try {
-//				countDownLatch.await();
-//			} catch (InterruptedException e1) {
-//			}
+			try {
+				countDownLatch.await();
+			} catch (InterruptedException e1) {
+			}
 			// CompletableFuture.allOf(room.send("TUNAKI ROCKS")).join();
 		} finally {
 			client.close();
