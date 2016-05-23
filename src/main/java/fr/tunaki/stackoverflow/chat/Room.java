@@ -1,9 +1,9 @@
 package fr.tunaki.stackoverflow.chat;
 
-import java.io.FileReader;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.time.Instant;
 import java.time.LocalTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -15,9 +15,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Properties;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -26,6 +25,8 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 import javax.websocket.ClientEndpointConfig;
 import javax.websocket.ClientEndpointConfig.Builder;
@@ -42,6 +43,7 @@ import org.jsoup.nodes.Document;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -332,8 +334,10 @@ public final class Room {
 	 */
 	public User getUser(long userId) {
 		Document document;
+		String pingableJson;
 		try {
 			document = httpClient.get("http://chat." + host + "/users/" + userId, cookies).parse();
+			pingableJson = httpClient.get("http://chat." + host + "/rooms/pingable/" + roomId, cookies).body();
 		} catch (IOException e) {
 			throw new ChatOperationException(e);
 		}
@@ -342,9 +346,31 @@ public final class Room {
 		int reputation = title.isEmpty() ? 0 : Integer.parseInt(title);
 		boolean moderator = document.getElementsByClass("user-status").html().contains("\u2666");
 		boolean roomOwner = document.getElementsByClass("roomcard").stream().anyMatch(e -> e.id().equals("room-" + roomId));
-		return new User(userId, userName, reputation, moderator, roomOwner);
+		Instant lastMessage = null, lastSeen = null;
+		Optional<JsonArray> opt = StreamSupport.stream(new JsonParser().parse(pingableJson).getAsJsonArray().spliterator(), false).map(JsonElement::getAsJsonArray).filter(e -> e.get(0).getAsLong() == userId).findFirst();
+		if (opt.isPresent()) {
+			lastMessage = Instant.ofEpochSecond(opt.get().get(3).getAsLong());
+			lastSeen = Instant.ofEpochSecond(opt.get().get(2).getAsLong());
+		}
+		return new User(userId, userName, reputation, moderator, roomOwner, lastSeen, lastMessage);
 	}
-
+	
+	/**
+	 * Returns the list of all the pingable users of this room.
+	 * <p>This consists of all the users that have been in the room at least once for the past 14 days.
+	 * @return List of pingable users of this room.
+	 */
+	public List<User> getPingableUsers() {
+		String json;
+		try {
+			json = httpClient.get("http://chat." + host + "/rooms/pingable/" + roomId, cookies).body();
+		} catch (IOException e) {
+			throw new ChatOperationException(e);
+		}
+		JsonArray array = new JsonParser().parse(json).getAsJsonArray();
+		return StreamSupport.stream(array.spliterator(), false).map(e -> getUser(e.getAsJsonArray().get(0).getAsLong())).collect(Collectors.toList());
+	}
+	
 	/**
 	 * Returns the id of this room. This id needs to be combined with the host
 	 * of this room to reference uniquely this room, as there can be rooms with
@@ -378,64 +404,6 @@ public final class Room {
 		try {
 			while (!executor.awaitTermination(5, TimeUnit.SECONDS));
 		} catch (InterruptedException e) { }
-	}
-
-	public static void main(String[] args) {
-		Properties properties = new Properties();
-		try (FileReader reader = new FileReader(System.getProperty("user.home") + "/chat.properties")) {
-			properties.load(reader);
-		} catch (IOException e) {
-			e.printStackTrace();
-			return;
-		}
-		StackExchangeClient client = new StackExchangeClient(properties.getProperty("email"), properties.getProperty("password"));
-		try {
-			CountDownLatch countDownLatch = new CountDownLatch(1);
-			Room room = client.joinRoom("stackoverflow.com", 111347);
-			
-			room.addEventListener(EventType.MESSAGE_POSTED, m -> {
-				System.out.println("Message posted");
-				if (m.getContent().equals("die")) {
-					countDownLatch.countDown();
-				} else {
-					System.out.println(room.isEditable(30690260));
-				}
-			});
-			
-//			CompletableFuture<Long> sentId = room.send("");
-//			sentId.thenAccept(messageId -> {
-//				room.edit(messageId, "blob")
-//				.handleAsync((mId, thr) -> {
-//					if (thr != null) return room.replyTo(messageId, "blob").join();
-//					return mId;
-//				})
-//				.thenAccept(mId -> System.out.println(mId));
-//				});
-						
-//			Room room2 = client.joinRoom("stackoverflow.com", 95290);
-//			room.addEventListener(EventType.MESSAGE_POSTED, e -> {
-//				if (e.getContent().equals("die")) {
-//					countDownLatch.countDown();
-//				}
-//			});
-//			room.addEventListener(EventType.MESSAGE_REPLY, e -> room.replyTo(e.getMessageId(), "Blob"));
-//			room2.addEventListener(EventType.MESSAGE_REPLY, e -> room2.replyTo(e.getMessageId(), "Blob"));
-			try {
-				countDownLatch.await();
-			} catch (InterruptedException e1) {
-			}
-			// CompletableFuture.allOf(room.send("TUNAKI ROCKS")).join();
-		} finally {
-			client.close();
-		}
-		// Room room2 = client.joinRoom("stackoverflow.com", 108192);
-		// try {
-		// CompletableFuture.allOf(IntStream.range(0, 20).mapToObj(i -> (i % 2
-		// == 0 ? room :room2).send("Blob blob blob " +
-		// i)).toArray(CompletableFuture[]::new)).join();
-		// } finally {
-		// client.close();
-		// }
 	}
 
 }

@@ -1,5 +1,7 @@
 package fr.tunaki.stackoverflow.chat;
 
+import java.time.Instant;
+
 /**
  * This class represents a chat user. Users having a negative id are system users (like Feeds).
  * <p>A user is inherently linked to a chat room: an instance of {@link User} can only be obtained by calling {@link Room#getUser(long)},
@@ -14,13 +16,17 @@ public final class User {
 	private int reputation;
 	private boolean moderator;
 	private boolean roomOwner;
+	private Instant lastSeenDate;
+	private Instant lastMessageDate;
 	
-	User(long id, String name, int reputation, boolean moderator, boolean roomOwner) {
+	User(long id, String name, int reputation, boolean moderator, boolean roomOwner, Instant lastSeenDate, Instant lastMessageDate) {
 		this.id = id;
 		this.name = name;
 		this.reputation = reputation;
 		this.moderator = moderator;
 		this.roomOwner = roomOwner;
+		this.lastSeenDate = lastSeenDate;
+		this.lastMessageDate = lastMessageDate;
 	}
 
 	/**
@@ -61,6 +67,24 @@ public final class User {
 	 */
 	public boolean isRoomOwner() {
 		return roomOwner;
+	}
+
+	/**
+	 * Returns the last date at which this user was seen in the room (UTC). This will be <code>null</code> in the case of
+	 * users that never joined the room.
+	 * @return Last date at which this user was seen in the room (UTC).
+	 */
+	public Instant getLastSeenDate() {
+		return lastSeenDate;
+	}
+
+	/**
+	 * Returns the last date at which this user posted a message in the room (UTC). This will be <code>null</code> in the case of
+	 * users that never joined the room.
+	 * @return Last date at which this user posted a message in the room (UTC).
+	 */
+	public Instant getLastMessageDate() {
+		return lastMessageDate;
 	}
 
 }
