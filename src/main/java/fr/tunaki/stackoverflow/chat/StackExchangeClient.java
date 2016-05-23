@@ -79,7 +79,7 @@ public class StackExchangeClient {
 	}
 
 	public void close() {
-		rooms.forEach(Room::close);
+		rooms.forEach(Room::leave);
 	}
 
 }
