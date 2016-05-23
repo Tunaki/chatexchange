@@ -392,18 +392,11 @@ public final class Room {
 	}
 
 	void close() {
-		shutdown(executor);
-		shutdown(eventExecutor);
+		executor.shutdown();
+		eventExecutor.shutdown();
 		try {
 			websocketSession.close();
 		} catch (IOException e) { }
-	}
-	
-	private void shutdown(ExecutorService executor) {
-		executor.shutdown();
-		try {
-			while (!executor.awaitTermination(5, TimeUnit.SECONDS));
-		} catch (InterruptedException e) { }
 	}
 
 }
