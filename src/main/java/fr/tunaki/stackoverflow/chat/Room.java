@@ -15,7 +15,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -335,26 +334,14 @@ public final class Room {
 	 * @return User with the given id.
 	 */
 	public User getUser(long userId) {
-		Document document;
-		String pingableJson;
-		try {
-			document = httpClient.get("http://chat." + host + "/users/" + userId, cookies).parse();
-			pingableJson = httpClient.get("http://chat." + host + "/rooms/pingable/" + roomId, cookies).body();
-		} catch (IOException e) {
-			throw new ChatOperationException(e);
-		}
-		String userName = document.getElementsByClass("user-status").html().replace('\u2666', ' ').replace("&nbsp;", "").trim();
-		String title = document.getElementsByClass("reputation-score").attr("title");
-		int reputation = title.isEmpty() ? 0 : Integer.parseInt(title);
-		boolean moderator = document.getElementsByClass("user-status").html().contains("\u2666");
-		boolean roomOwner = document.getElementsByClass("roomcard").stream().anyMatch(e -> e.id().equals("room-" + roomId));
-		Instant lastMessage = null, lastSeen = null;
-		Optional<JsonArray> opt = StreamSupport.stream(new JsonParser().parse(pingableJson).getAsJsonArray().spliterator(), false).map(JsonElement::getAsJsonArray).filter(e -> e.get(0).getAsLong() == userId).findFirst();
-		if (opt.isPresent()) {
-			lastMessage = Instant.ofEpochSecond(opt.get().get(3).getAsLong());
-			lastSeen = Instant.ofEpochSecond(opt.get().get(2).getAsLong());
-		}
-		return new User(userId, userName, reputation, moderator, roomOwner, lastSeen, lastMessage);
+		JsonObject object = post("http://chat." + host + "/user/info", "ids", String.valueOf(userId), "roomId", String.valueOf(roomId)).getAsJsonObject().get("users").getAsJsonArray().get(0).getAsJsonObject();
+		String userName = object.get("name").getAsString();
+		int reputation = object.get("reputation").getAsInt();
+		boolean moderator = object.get("is_moderator").isJsonNull() ? false : object.get("is_moderator").getAsBoolean();
+		boolean owner = object.get("is_owner").isJsonNull() ? false : object.get("is_owner").getAsBoolean();
+		Instant lastSeen = object.get("last_seen").isJsonNull() ? null : Instant.ofEpochSecond(object.get("last_seen").getAsLong());
+		Instant lastMessage = object.get("last_post").isJsonNull() ? null : Instant.ofEpochSecond(object.get("last_post").getAsLong());
+		return new User(object.get("id").getAsLong(), userName, reputation, moderator, owner, lastSeen, lastMessage);
 	}
 	
 	/**
