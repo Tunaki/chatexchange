@@ -39,7 +39,9 @@ import javax.websocket.Session;
 import org.glassfish.tyrus.client.ClientManager;
 import org.glassfish.tyrus.container.jdk.client.JdkClientContainer;
 import org.jsoup.Connection.Response;
+import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -379,6 +381,23 @@ public final class Room {
 	 */
 	public long getRoomId() {
 		return roomId;
+	}
+	
+	/**
+	 * Returns the thumbs for this chat room. This includes various informations such as: name, description...
+	 * <p>Refer to {@link RoomThumbs} for a description of all the fields.
+	 * @return Thumbs for this chat room
+	 */
+	public RoomThumbs getThumbs() {
+		String json;
+		try {
+			json = httpClient.get("http://chat." + host + "/rooms/thumbs/" + roomId, cookies).body();
+		} catch (IOException e) {
+			throw new ChatOperationException(e);
+		}
+		JsonObject obj = new JsonParser().parse(json).getAsJsonObject();
+		List<String> tags = Jsoup.parse(obj.get("tags").getAsString()).getElementsByTag("a").stream().map(Element::html).collect(Collectors.toList());
+		return new RoomThumbs(obj.get("id").getAsLong(), obj.get("name").getAsString(), obj.get("description").getAsString(), obj.get("isFavorite").getAsBoolean(), tags);
 	}
 
 	/**
