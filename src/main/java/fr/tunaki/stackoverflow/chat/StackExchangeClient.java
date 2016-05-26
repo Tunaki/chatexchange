@@ -74,14 +74,25 @@ public class StackExchangeClient {
 		Response response = httpClient.get("http://" + host + "/users/login?returnurl=" + URLEncoder.encode("http://" + host + "/", "UTF-8"), cookies);
 		String fkey = response.parse().select("input[name='fkey']").val();
 		response = httpClient.post("http://" + host + "/users/authenticate", cookies, "fkey", fkey, "openid_identifier", openIdProvider);
+		
+		// confirmation prompt?
+		if (response.url().toString().startsWith("https://openid.stackexchange.com/account/prompt")) {
+			Document document = response.parse();
+			LOGGER.trace("Confirmation prompt \n" + document.html());
+			String session = document.select("input[name='session']").first().val();
+			fkey = document.select("input[name='fkey']").first().val();
+			Response promptResponse = httpClient.post("https://openid.stackexchange.com/account/prompt/submit", cookies, "session", session, "fkey", fkey);
+			LOGGER.trace("Confirmation prompt response \n" + promptResponse.parse().html());
+		}
+		
+		// check logged in
 		Response checkResponse = httpClient.get("http://" + host + "/users/current", cookies);
 		if (checkResponse.parse().getElementsByClass("reputation").first() == null) {
 			LOGGER.debug(response.parse().html());
-			LOGGER.debug(checkResponse.parse().html());
 			throw new IllegalStateException("Unable to login to Stack Exchange.");
 		}
 	}
-
+	
 	public void close() {
 		rooms.forEach(Room::leave);
 	}
