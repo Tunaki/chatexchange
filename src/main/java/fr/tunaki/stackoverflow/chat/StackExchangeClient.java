@@ -12,8 +12,12 @@ import java.util.regex.Pattern;
 
 import org.jsoup.Connection.Response;
 import org.jsoup.nodes.Document;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class StackExchangeClient {
+	
+	private static final Logger LOGGER = LoggerFactory.getLogger(StackExchangeClient.class);
 
 	private static final Pattern OPEN_ID_PROVIDER_PATTERN = Pattern.compile("(https://openid.stackexchange.com/user/.*?)\"");
 
@@ -39,10 +43,12 @@ public class StackExchangeClient {
 		response = httpClient.post("https://openid.stackexchange.com/account/login/submit", cookies, "email", email, "password", password, "fkey", fkey);
 		Document document = response.parse();
 		if (document.getElementsByClass("error").size() > 0) {
+			LOGGER.debug(document.html());
 			throw new ChatOperationException("Invalid OpenID credentials");
 		}
 		Matcher matcher = OPEN_ID_PROVIDER_PATTERN.matcher(document.getElementById("delegate").html());
 		if (!matcher.find()) {
+			LOGGER.debug(document.html());
 			throw new IllegalStateException("Cannot retrieve the OpenID provider");
 		}
 		openIdProvider = matcher.group(1);
@@ -74,6 +80,7 @@ public class StackExchangeClient {
 	private void checkLoggedIn(String host) throws IOException {
 		Response response = httpClient.get("http://" + host + "/users/current", cookies);
 		if (response.parse().getElementsByClass("reputation").first() == null) {
+			LOGGER.debug(response.parse().html());
 			throw new IllegalStateException("Unable to login to Stack Exchange.");
 		}
 	}
