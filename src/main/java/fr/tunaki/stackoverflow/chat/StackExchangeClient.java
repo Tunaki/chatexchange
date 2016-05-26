@@ -74,13 +74,10 @@ public class StackExchangeClient {
 		Response response = httpClient.get("http://" + host + "/users/login?returnurl=" + URLEncoder.encode("http://" + host + "/", "UTF-8"), cookies);
 		String fkey = response.parse().select("input[name='fkey']").val();
 		response = httpClient.post("http://" + host + "/users/authenticate", cookies, "fkey", fkey, "openid_identifier", openIdProvider);
-		checkLoggedIn(host);
-	}
-
-	private void checkLoggedIn(String host) throws IOException {
-		Response response = httpClient.get("http://" + host + "/users/current", cookies);
-		if (response.parse().getElementsByClass("reputation").first() == null) {
+		Response checkResponse = httpClient.get("http://" + host + "/users/current", cookies);
+		if (checkResponse.parse().getElementsByClass("reputation").first() == null) {
 			LOGGER.debug(response.parse().html());
+			LOGGER.debug(checkResponse.parse().html());
 			throw new IllegalStateException("Unable to login to Stack Exchange.");
 		}
 	}
