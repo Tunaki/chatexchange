@@ -12,15 +12,18 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.function.LongPredicate;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -59,6 +62,7 @@ public final class Room {
 
 	private static final String SUCCESS = "ok";
 	private static final Pattern TRY_AGAIN_PATTERN = Pattern.compile("You can perform this action again in (\\d+) seconds");
+	private static final Pattern CURRENT_USERS_PATTERN = Pattern.compile("\\{id:\\s?(\\d+),");
 	private static final int NUMBER_OF_RETRIES_ON_THROTTLE = 5;
 	private static final DateTimeFormatter MESSAGE_TIME_FORMATTER = DateTimeFormatter.ofPattern("hh:mm a").withZone(ZoneOffset.UTC);
 	private static final int EDIT_WINDOW_SECONDS = 115;
@@ -77,17 +81,28 @@ public final class Room {
 	private Map<String, String> cookies;
 
 	private boolean hasLeft = false;
+	
+	private List<Long> pingableUserIds;
+	private Set<Long> currentUserIds = new HashSet<>();
 
 	Room(String host, long roomId, HttpClient httpClient, Map<String, String> cookies) {
 		this.roomId = roomId;
 		this.host = host;
 		this.httpClient = httpClient;
 		this.cookies = new HashMap<>(cookies);
-		fkey = retrieveFKey(roomId);
-		executor.scheduleAtFixedRate(() -> fkey = retrieveFKey(roomId), 1, 1, TimeUnit.HOURS);
+		executeAndSchedule(() -> fkey = retrieveFKey(roomId), 1);
+		executeAndSchedule(this::syncPingableUsers, 24);
+		syncCurrentUsers();
 		startWebsocket();
+		addEventListener(EventType.USER_ENTERED, e -> currentUserIds.add(e.getUserId()));
+		addEventListener(EventType.USER_LEFT, e -> currentUserIds.remove(e.getUserId()));
 	}
-
+	
+	private void executeAndSchedule(Runnable action, int rate) {
+		action.run();
+		executor.scheduleAtFixedRate(action, rate, rate, TimeUnit.HOURS);
+	}
+	
 	private JsonElement post(String url, String... data) {
 		return post(NUMBER_OF_RETRIES_ON_THROTTLE, url, data);
 	}
@@ -329,27 +344,15 @@ public final class Room {
 	}
 	
 	/**
-	 * Retrieves the {@link User} having the given id.
-	 * @param messageId Id of the user to fetch.
-	 * @return User with the given id.
-	 */
-	public User getUser(long userId) {
-		JsonObject object = post("http://chat." + host + "/user/info", "ids", String.valueOf(userId), "roomId", String.valueOf(roomId)).getAsJsonObject().get("users").getAsJsonArray().get(0).getAsJsonObject();
-		String userName = object.get("name").getAsString();
-		int reputation = object.get("reputation").getAsInt();
-		boolean moderator = object.get("is_moderator").isJsonNull() ? false : object.get("is_moderator").getAsBoolean();
-		boolean owner = object.get("is_owner").isJsonNull() ? false : object.get("is_owner").getAsBoolean();
-		Instant lastSeen = object.get("last_seen").isJsonNull() ? null : Instant.ofEpochSecond(object.get("last_seen").getAsLong());
-		Instant lastMessage = object.get("last_post").isJsonNull() ? null : Instant.ofEpochSecond(object.get("last_post").getAsLong());
-		return new User(object.get("id").getAsLong(), userName, reputation, moderator, owner, lastSeen, lastMessage);
-	}
-	
-	/**
 	 * Returns the list of all the pingable users of this room.
 	 * <p>This consists of all the users that have been in the room at least once for the past 14 days.
 	 * @return List of pingable users of this room.
 	 */
 	public List<User> getPingableUsers() {
+		return getUsers(pingableUserIds, currentUserIds::contains);
+	}
+	
+	private void syncPingableUsers() {
 		String json;
 		try {
 			json = httpClient.get("http://chat." + host + "/rooms/pingable/" + roomId, cookies).body();
@@ -357,9 +360,56 @@ public final class Room {
 			throw new ChatOperationException(e);
 		}
 		JsonArray array = new JsonParser().parse(json).getAsJsonArray();
-		return StreamSupport.stream(array.spliterator(), false).map(e -> getUser(e.getAsJsonArray().get(0).getAsLong())).collect(Collectors.toList());
+		pingableUserIds = StreamSupport.stream(array.spliterator(), false).map(e -> e.getAsJsonArray().get(0).getAsLong()).collect(Collectors.toList());
 	}
 	
+	/**
+	 * Returns the list of all the current users of this room.
+	 * <p>This consists of all the users that are present, at the moment of this call, in the room.
+	 * @return List of current users of this room.
+	 */
+	public List<User> getCurrentUsers() {
+		return getUsers(currentUserIds, id -> true);
+	}
+	
+	private void syncCurrentUsers() {
+		Document document;
+		try {
+			document = httpClient.get("http://chat." + host + "/rooms/" + roomId, cookies).parse();
+		} catch (IOException e) {
+			throw new ChatOperationException(e);
+		}
+		String html = document.getElementsByTag("script").get(3).html();
+		Matcher matcher = CURRENT_USERS_PATTERN.matcher(html);
+		currentUserIds.clear();
+		while (matcher.find()) {
+			currentUserIds.add(Long.valueOf(matcher.group(1)));
+		}
+	}
+	
+	/**
+	 * Retrieves the {@link User} having the given id.
+	 * @param messageId Id of the user to fetch.
+	 * @return User with the given id.
+	 */
+	public User getUser(long userId) {
+		return getUsers(Arrays.asList(userId), currentUserIds::contains).get(0);
+	}
+	
+	private List<User> getUsers(Iterable<Long> userIds, LongPredicate inRoom) {
+		String ids = StreamSupport.stream(userIds.spliterator(), false).map(Object::toString).collect(Collectors.joining(","));
+		return StreamSupport.stream(post("http://chat." + host + "/user/info", "ids", ids, "roomId", String.valueOf(roomId)).getAsJsonObject().get("users").getAsJsonArray().spliterator(), false).map(JsonElement::getAsJsonObject).map(object -> {
+			long id = object.get("id").getAsLong();
+			String userName = object.get("name").getAsString();
+			int reputation = object.get("reputation").getAsInt();
+			boolean moderator = object.get("is_moderator").isJsonNull() ? false : object.get("is_moderator").getAsBoolean();
+			boolean owner = object.get("is_owner").isJsonNull() ? false : object.get("is_owner").getAsBoolean();
+			Instant lastSeen = object.get("last_seen").isJsonNull() ? null : Instant.ofEpochSecond(object.get("last_seen").getAsLong());
+			Instant lastMessage = object.get("last_post").isJsonNull() ? null : Instant.ofEpochSecond(object.get("last_post").getAsLong());
+			return new User(id, userName, reputation, moderator, owner, lastSeen, lastMessage, inRoom.test(id));
+		}).collect(Collectors.toList());
+	}
+
 	/**
 	 * Returns the id of this room. This id needs to be combined with the host
 	 * of this room to reference uniquely this room, as there can be rooms with

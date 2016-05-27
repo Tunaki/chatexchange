@@ -18,8 +18,9 @@ public final class User {
 	private boolean roomOwner;
 	private Instant lastSeenDate;
 	private Instant lastMessageDate;
+	private boolean currentlyInRoom;
 	
-	User(long id, String name, int reputation, boolean moderator, boolean roomOwner, Instant lastSeenDate, Instant lastMessageDate) {
+	User(long id, String name, int reputation, boolean moderator, boolean roomOwner, Instant lastSeenDate, Instant lastMessageDate, boolean currentlyInRoom) {
 		this.id = id;
 		this.name = name;
 		this.reputation = reputation;
@@ -27,6 +28,7 @@ public final class User {
 		this.roomOwner = roomOwner;
 		this.lastSeenDate = lastSeenDate;
 		this.lastMessageDate = lastMessageDate;
+		this.currentlyInRoom = currentlyInRoom;
 	}
 
 	/**
@@ -85,6 +87,14 @@ public final class User {
 	 */
 	public Instant getLastMessageDate() {
 		return lastMessageDate;
+	}
+
+	/**
+	 * Tells whether this user is currently in this room or not.
+	 * @return Currently in the room or not.
+	 */
+	public boolean isCurrentlyInRoom() {
+		return currentlyInRoom;
 	}
 
 }
