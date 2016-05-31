@@ -1,7 +1,6 @@
 package fr.tunaki.stackoverflow.chat.event;
 
-import org.jsoup.Jsoup;
-import org.jsoup.safety.Whitelist;
+import org.jsoup.parser.Parser;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -9,7 +8,7 @@ import com.google.gson.JsonObject;
 /**
  * Represents an event that is the result of an action being performed on a message. This is the base class for all messages type
  * events, like posting, editing, replying, etc.
- * <p>The content of the message will be stripped of some HTML tags, as defined by {@link Whitelist#relaxed()}, and HTML decoded.
+ * <p>The content of the message sent by the chat event is HTML encoded: this class will unescape the HTML entities.
  * @author Tunaki
  */
 public abstract class MessageEvent extends Event {
@@ -23,11 +22,15 @@ public abstract class MessageEvent extends Event {
 	MessageEvent(JsonElement jsonElement) {
 		super(jsonElement);
 		JsonObject jsonObject = jsonElement.getAsJsonObject();
-		content = orDefault(jsonObject.get("content"), null, e -> Jsoup.clean(e.getAsString(), Whitelist.relaxed()));
+		content = orDefault(jsonObject.get("content"), null, e -> htmlDecode(htmlDecode(jsonObject.get("content").getAsString())));
 		messageId = jsonObject.get("message_id").getAsLong();
 		editCount = orDefault(jsonObject.get("message_edits"), 0, JsonElement::getAsInt);
 		starCount = orDefault(jsonObject.get("message_stars"), 0, JsonElement::getAsInt);
 		pinCount = orDefault(jsonObject.get("message_owner_stars"), 0, JsonElement::getAsInt);
+	}
+	
+	private String htmlDecode(String str) {
+		return Parser.unescapeEntities(str, false);
 	}
 
 	/**
