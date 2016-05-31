@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -66,11 +67,13 @@ public final class Room {
 	private static final int NUMBER_OF_RETRIES_ON_THROTTLE = 5;
 	private static final DateTimeFormatter MESSAGE_TIME_FORMATTER = DateTimeFormatter.ofPattern("hh:mm a").withZone(ZoneOffset.UTC);
 	private static final int EDIT_WINDOW_SECONDS = 115;
+	private static final int WEB_SOCKET_RESTART_SECONDS = 30;
 
 	private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
 	private final ExecutorService eventExecutor = Executors.newCachedThreadPool();
 
-	private Session websocketSession;
+	private Session webSocketSession;
+	private LocalDateTime lastWebsocketMessageDate = LocalDateTime.now();
 	private Map<EventType<Object>, List<Consumer<Object>>> chatEventListeners = new HashMap<>();
 
 	private long roomId;
@@ -93,7 +96,14 @@ public final class Room {
 		executeAndSchedule(() -> fkey = retrieveFKey(roomId), 1);
 		executeAndSchedule(this::syncPingableUsers, 24);
 		syncCurrentUsers();
-		startWebsocket();
+		startWebSocket();
+		executor.scheduleAtFixedRate(() -> {
+			if (ChronoUnit.SECONDS.between(lastWebsocketMessageDate, LocalDateTime.now()) > WEB_SOCKET_RESTART_SECONDS) {
+				LOGGER.debug("Rebooting the WebSocket connection after {} seconds of inactivity", WEB_SOCKET_RESTART_SECONDS);
+				closeWebSocket();
+				startWebSocket();
+			}
+		}, WEB_SOCKET_RESTART_SECONDS, WEB_SOCKET_RESTART_SECONDS, TimeUnit.SECONDS);
 		addEventListener(EventType.USER_ENTERED, e -> currentUserIds.add(e.getUserId()));
 		addEventListener(EventType.USER_LEFT, e -> currentUserIds.remove(e.getUserId()));
 	}
@@ -150,7 +160,7 @@ public final class Room {
 		}
 	}
 
-	private void startWebsocket() {
+	private void startWebSocket() {
 		String websocketUrl = post("http://chat." + host + "/ws-auth", "roomid", String.valueOf(roomId)).getAsJsonObject().get("url").getAsString();
 		String time = post("http://chat." + host + "/chats/" + roomId + "/events").getAsJsonObject().get("time").getAsString();
 		ClientManager client = ClientManager.createClient(JdkClientContainer.class.getName());
@@ -164,7 +174,7 @@ public final class Room {
 		websocketUrl += "?l=" + time;
 		LOGGER.debug("Connecting to chat websocket " + websocketUrl);
 		try {
-			websocketSession = client.connectToServer(new Endpoint() {
+			webSocketSession = client.connectToServer(new Endpoint() {
 				@Override
 				public void onOpen(Session session, EndpointConfig config) {
 					session.addMessageHandler(String.class, Room.this::handleChatEvent);
@@ -178,9 +188,18 @@ public final class Room {
 			throw new ChatOperationException("Cannot connect to chat websocket", e);
 		}
 	}
+	
+	private void closeWebSocket() {
+		try {
+			webSocketSession.close();
+		} catch (IOException e) {
+			LOGGER.error("Error while closing the WebSocket", e);
+		}
+	}
 
 	private void handleChatEvent(String json) {
 		LOGGER.debug("Received message: " + json);
+		lastWebsocketMessageDate = LocalDateTime.now();
 		JsonObject jsonObject = new JsonParser().parse(json).getAsJsonObject();
 		jsonObject.entrySet().stream().filter(e -> e.getKey().equals("r" + roomId)).map(Map.Entry::getValue).map(JsonElement::getAsJsonObject).map(o -> o.get("e")).filter(Objects::nonNull).map(JsonElement::getAsJsonArray).findFirst().ifPresent(events -> {
 			for (Event event : Events.fromJsonData(events, roomId)) {
@@ -450,9 +469,7 @@ public final class Room {
 	void close() {
 		executor.shutdown();
 		eventExecutor.shutdown();
-		try {
-			websocketSession.close();
-		} catch (IOException e) { }
+		closeWebSocket();
 	}
 
 }
