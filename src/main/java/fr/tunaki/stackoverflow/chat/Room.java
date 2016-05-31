@@ -120,7 +120,7 @@ public final class Room {
 		}
 		Matcher matcher = TRY_AGAIN_PATTERN.matcher(body);
 		if (retryCount > 0 && matcher.find()) {
-			int throttle = Integer.parseInt(matcher.group(1));
+			long throttle = Long.parseLong(matcher.group(1));
 			LOGGER.debug("Tried to POST to URL {} with data {} but was throttled, retrying in {} seconds", url, data, throttle);
 			try {
 				Thread.sleep(1000 * throttle);
