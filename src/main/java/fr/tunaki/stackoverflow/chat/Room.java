@@ -350,8 +350,8 @@ public final class Room {
 	 */
 	public Message getMessage(long messageId) {
 		try {
-			String plainContent = httpClient.get("http://chat." + host + "/message/" + messageId, cookies, "fkey", fkey, "plain", "true").parse().body().html();
-			String content = httpClient.get("http://chat." + host + "/message/" + messageId, cookies, "fkey", fkey, "plain", "false").parse().body().html();
+			String plainContent = httpClient.get("http://chat." + host + "/message/" + messageId, cookies, "fkey", fkey, "plain", "true").body();
+			String content = httpClient.get("http://chat." + host + "/message/" + messageId, cookies, "fkey", fkey, "plain", "false").body();
 			Document documentHistory = httpClient.get("http://chat." + host + "/messages/" + messageId + "/history", cookies, "fkey", fkey).parse();
 			User user = getUser(Long.parseLong(documentHistory.select(".username > a").first().attr("href").split("/")[2]));
 			boolean deleted = documentHistory.select(".message .content").stream().anyMatch(e -> e.getElementsByTag("b").html().equals("deleted"));
