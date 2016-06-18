@@ -64,6 +64,11 @@ public final class EventType<T> {
 	 */
 	public static final EventType<MessageDeletedEvent> MESSAGE_DELETED = new EventType<>(MessageDeletedEvent.class);
 	
+	/**
+	 * Event raised when a user was kicked out of the chat room.
+	 */
+	public static final EventType<KickedEvent> KICKED = new EventType<>(KickedEvent.class);
+	
 	@SuppressWarnings("unchecked")
 	private EventType(Class<T> clazz) {
 		LOOKUP.put((Class<Object>) clazz, (EventType<Object>) this);

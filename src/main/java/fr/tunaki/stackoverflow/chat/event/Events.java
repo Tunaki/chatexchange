@@ -1,12 +1,16 @@
 package fr.tunaki.stackoverflow.chat.event;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 
 /**
  * Utility class to operate on events.
@@ -23,13 +27,13 @@ public final class Events {
 	 * @return List of events with their data.
 	 */
 	public static List<Event> fromJsonData(JsonArray events, long roomId) {
-		//TODO: special trickery for 2 event types meaning a single real event, like kicking or adding as RO
-		return StreamSupport.stream(events.spliterator(), false)
-				.map(JsonElement::getAsJsonObject)
-				.filter(object -> object.get("room_id").getAsLong() == roomId)
+		//kicked?
+		if (events.size() == 2 && jsonObjects(events).anyMatch(o -> getEventType(o) == 4) && jsonObjects(events).anyMatch(o -> getEventType(o) == 15)) {
+			return new ArrayList<>(Arrays.asList(new KickedEvent(events)));
+		}
+		return jsonObjects(events).filter(object -> object.get("room_id").getAsLong() == roomId)
 				.map(object -> {
-					int eventType = object.get("event_type").getAsInt();
-					switch (eventType) {
+					switch (getEventType(object)) {
 					case 1:
 						if (object.get("user_id").getAsLong() > 0) {
 							return new MessagePostedEvent(object);
@@ -46,6 +50,14 @@ public final class Events {
 						return null;
 					}
 				}).filter(Objects::nonNull).collect(Collectors.toList());
+	}
+	
+	private static Stream<JsonObject> jsonObjects(JsonArray array) {
+		return StreamSupport.stream(array.spliterator(), false).map(JsonElement::getAsJsonObject);
+	}
+	
+	private static int getEventType(JsonObject object) {
+		return object.get("event_type").getAsInt();
 	}
 
 }
