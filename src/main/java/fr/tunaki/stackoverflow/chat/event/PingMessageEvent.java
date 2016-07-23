@@ -3,6 +3,8 @@ package fr.tunaki.stackoverflow.chat.event;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
+import fr.tunaki.stackoverflow.chat.Message;
+
 /**
  * Represents an event that is the result of ping message action. A ping corresponds to a message that either replies to another
  * message (with the <code>:{messageId}</code> chat feature) or mentions a user (with the <code>@{userName}</code> chat feature).
@@ -14,8 +16,8 @@ public abstract class PingMessageEvent extends MessageEvent {
 	private long targetUserId;
 	private long parentMessageId;
 
-	PingMessageEvent(JsonElement jsonElement) {
-		super(jsonElement);
+	PingMessageEvent(JsonElement jsonElement, Message message) {
+		super(jsonElement, message);
 		JsonObject jsonObject = jsonElement.getAsJsonObject();
 		targetUserId = jsonObject.get("target_user_id").getAsLong();
 		parentMessageId = orDefault(jsonObject.get("parent_id"), -1, JsonElement::getAsLong);

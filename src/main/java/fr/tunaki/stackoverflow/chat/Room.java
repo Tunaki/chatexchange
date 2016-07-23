@@ -202,7 +202,7 @@ public final class Room {
 		lastWebsocketMessageDate = LocalDateTime.now();
 		JsonObject jsonObject = new JsonParser().parse(json).getAsJsonObject();
 		jsonObject.entrySet().stream().filter(e -> e.getKey().equals("r" + roomId)).map(Map.Entry::getValue).map(JsonElement::getAsJsonObject).map(o -> o.get("e")).filter(Objects::nonNull).map(JsonElement::getAsJsonArray).findFirst().ifPresent(events -> {
-			for (Event event : Events.fromJsonData(events, roomId)) {
+			for (Event event : Events.fromJsonData(events, this)) {
 				for (Consumer<Object> listener : chatEventListeners.getOrDefault(EventType.fromEvent(event), Collections.emptyList())) {
 					eventExecutor.submit(() -> listener.accept(event));
 				}
