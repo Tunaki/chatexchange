@@ -8,6 +8,8 @@ package fr.tunaki.stackoverflow.chat;
  * <p>A message is inherently linked to a chat room: an instance of {@link Message} can only be obtained by calling {@link Room#getMessage(long)},
  * by giving it the id of the message to look for. 
  * <p>A message also contains a reference to the user that posted it. Refer to {@link User}.
+ * <p>When a message is deleted, its content and user will always be <code>null</code>, except if the current user is room-owner
+ * or it is one of their own message.
  * @author Tunaki.
  */
 public final class Message {
@@ -35,7 +37,8 @@ public final class Message {
 	}
 
 	/**
-	 * Returns the user that posted this message.
+	 * Returns the user that posted this message. This will be <code>null</code> if the current user is not a room-owner
+	 * or this message is not one of their own message.
 	 * @return User that posted this message.
 	 */
 	public User getUser() {
@@ -44,6 +47,7 @@ public final class Message {
 
 	/**
 	 * Returns the plain content of this message. This is the original markdown source of the message.
+	 * This will be <code>null</code> if the current user is not a room-owner or this message is not one of their own message.
 	 * @return Plain content of this message
 	 */
 	public String getPlainContent() {
@@ -52,6 +56,7 @@ public final class Message {
 
 	/**
 	 * Returns the content of this message. This is the rendered HTML of the message.
+	 * This will be <code>null</code> if the current user is not a room-owner or this message is not one of their own message.
 	 * @return Content of this message
 	 */
 	public String getContent() {

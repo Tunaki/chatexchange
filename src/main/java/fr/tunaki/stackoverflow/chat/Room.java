@@ -1,5 +1,6 @@
 package fr.tunaki.stackoverflow.chat;
 
+import java.io.FileReader;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -17,8 +18,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -42,6 +45,7 @@ import javax.websocket.Session;
 import org.glassfish.tyrus.client.ClientManager;
 import org.glassfish.tyrus.container.jdk.client.JdkClientContainer;
 import org.jsoup.Connection.Response;
+import org.jsoup.HttpStatusException;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -356,10 +360,16 @@ public final class Room {
 			User user = getUser(Long.parseLong(documentHistory.select(".username > a").first().attr("href").split("/")[2]));
 			boolean deleted = documentHistory.select(".message .content").stream().anyMatch(e -> e.getElementsByTag("b").html().equals("deleted"));
 			return new Message(messageId, user, plainContent, content, deleted);
+		} catch (HttpStatusException e) {
+			if (e.getStatusCode() == 404) {
+				LOGGER.info("Tried to view deleted message " + messageId);
+				// non-RO cannot see deleted message of another user: so if 404, it means message is deleted
+				return new Message(messageId, null, null, null, true);
+			}
+			throw new ChatOperationException(e);
 		} catch (IOException e) {
 			throw new ChatOperationException(e);
 		}
-		
 	}
 	
 	/**
