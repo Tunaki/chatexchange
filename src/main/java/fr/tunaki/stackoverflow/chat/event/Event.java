@@ -23,12 +23,14 @@ public abstract class Event {
 	private Instant instant;
 	private long userId;
 	private String userName;
+	private int roomId;
 
 	Event(JsonElement jsonElement) {
 		JsonObject jsonObject = jsonElement.getAsJsonObject();
 		instant = Instant.ofEpochSecond(jsonObject.get("time_stamp").getAsLong());
 		userId = orDefault(jsonObject.get("user_id"), 0, JsonElement::getAsLong);
 		userName = orDefault(jsonObject.get("user_name"), null, JsonElement::getAsString);
+		roomId = orDefault(jsonObject.get("room_id"), 0, JsonElement::getAsInt);
 	}
 	
 	/**
@@ -57,6 +59,14 @@ public abstract class Event {
 		return userName;
 	}
 	
+	/**
+	 * The id of the room this event took place.
+	 * @return ID of the room this event took place.
+	 */
+	public int getRoomId() {
+		return roomId;
+	}
+
 	protected <T> T orDefault(JsonElement element, T defaultValue, Function<JsonElement, T> function) {
 		return element == null ? defaultValue : function.apply(element);
 	}
