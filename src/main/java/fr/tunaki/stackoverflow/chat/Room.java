@@ -1,6 +1,5 @@
 package fr.tunaki.stackoverflow.chat;
 
-import java.io.FileReader;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -15,13 +14,12 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -68,11 +66,13 @@ public final class Room {
 	private static final String SUCCESS = "ok";
 	private static final Pattern TRY_AGAIN_PATTERN = Pattern.compile("You can perform this action again in (\\d+) seconds");
 	private static final Pattern CURRENT_USERS_PATTERN = Pattern.compile("\\{id:\\s?(\\d+),");
+	private static final Pattern MARKDOWN_LINK_PATTERN = Pattern.compile("\\[(\\\\]|[^\\]])+\\]\\((https?:)?//(\\\\\\)|\\\\\\(|[^\\s)(])+\\)"); // oh dear god
 	private static final int NUMBER_OF_RETRIES_ON_THROTTLE = 5;
 	private static final DateTimeFormatter MESSAGE_TIME_FORMATTER = DateTimeFormatter.ofPattern("hh:mm a").withZone(ZoneOffset.UTC);
 	private static final int EDIT_WINDOW_SECONDS = 115;
 	private static final int WEB_SOCKET_RESTART_SECONDS = 30;
-
+	private static final int MAX_CHAT_MESSAGE_LENGTH = 500;
+	
 	private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
 	private final ExecutorService eventExecutor = Executors.newCachedThreadPool();
 
@@ -240,11 +240,56 @@ public final class Room {
 	 */
 	public CompletableFuture<Long> send(String message) {
 		LOGGER.info("Task added - sending message '{}' to room {}.", message, roomId);
+		List<String> parts = toParts(message, MAX_CHAT_MESSAGE_LENGTH);
+		// only return the id of the last message (this way, the 99.99% case of a single message works just as before)
+		for (int i = 0; i < parts.size() - 1; i++) {
+			String part = parts.get(i);
+			supplyAsync(() -> {
+				JsonElement element = post("http://chat." + host + "/chats/" + roomId + "/messages/new", "text", part);
+				LOGGER.debug("Message '{}' sent to room {}, raw result: {}", part, roomId, element);
+				return element.getAsJsonObject().get("id").getAsLong();
+			});
+		}
+		String part = parts.get(parts.size() - 1);
 		return supplyAsync(() -> {
-			JsonElement element = post("http://chat." + host + "/chats/" + roomId + "/messages/new", "text", message);
-			LOGGER.debug("Message '{}' sent to room {}, raw result: {}", message, roomId, element);
+			JsonElement element = post("http://chat." + host + "/chats/" + roomId + "/messages/new", "text", part);
+			LOGGER.debug("Message '{}' sent to room {}, raw result: {}", part, roomId, element);
 			return element.getAsJsonObject().get("id").getAsLong();
 		});
+	}
+
+	private static List<String> toParts(String message, int maxPartLength) {
+		if (message.length() <= maxPartLength || (message.trim().contains("\n") && !message.trim().endsWith("\n"))) {
+			return Arrays.asList(message);
+		}
+		List<String> messages = new ArrayList<>();
+		while (message.length() > maxPartLength) {
+			List<Integer[]> nonBreakingIndexes = identifyNonBreakingIndexes(message);
+			int potentialBreakIndex = message.lastIndexOf(' ', maxPartLength), breakIndex = potentialBreakIndex;
+			for (Iterator<Integer[]> it = nonBreakingIndexes.iterator(); it.hasNext();) {
+				Integer[] bounds = it.next();
+				if (bounds[0] < potentialBreakIndex && potentialBreakIndex < bounds[1]) {
+					breakIndex = bounds[0] - 1;
+					break;
+				}
+			}
+			messages.add(message.substring(0, breakIndex));
+			message = message.substring(breakIndex + 1);
+		}
+		if (!message.isEmpty()) {
+			messages.add(message);
+		}
+		return messages;
+	}
+
+	private static List<Integer[]> identifyNonBreakingIndexes(String message) {
+		// identify non-breaking parts: links.
+		List<Integer[]> nonBreakingParts = new ArrayList<>();
+		Matcher matcher = MARKDOWN_LINK_PATTERN.matcher(message);
+		while (matcher.find()) {
+			nonBreakingParts.add(new Integer[] { matcher.start(), matcher.end() });
+		}
+		return nonBreakingParts;
 	}
 
 	/**
