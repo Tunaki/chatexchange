@@ -272,7 +272,7 @@ public final class Room {
 	 * @return Id of the posted message (which is going to be a one-box).
 	 */
 	public CompletableFuture<String> uploadImage(String fileName, InputStream inputStream) {
-		return CompletableFuture.supplyAsync(() -> {
+		return supplyAsync(() -> {
 			Response response;
 			try {
 				response = httpClient.postWithFile("http://chat." + host + "/upload/image", cookies, "filename", fileName, inputStream);
