@@ -1,6 +1,9 @@
 package fr.tunaki.stackoverflow.chat;
 
+import java.io.FileInputStream;
+import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.Instant;
@@ -18,8 +21,10 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -67,12 +72,14 @@ public final class Room {
 	private static final Pattern TRY_AGAIN_PATTERN = Pattern.compile("You can perform this action again in (\\d+) seconds");
 	private static final Pattern CURRENT_USERS_PATTERN = Pattern.compile("\\{id:\\s?(\\d+),");
 	private static final Pattern MARKDOWN_LINK_PATTERN = Pattern.compile("\\[(\\\\]|[^\\]])+\\]\\((https?:)?//(\\\\\\)|\\\\\\(|[^\\s)(])+\\)"); // oh dear god
+	private static final Pattern FAILED_UPLOAD_PATTERN = Pattern.compile("var error = '(.+)';");
+	private static final Pattern SUCCESS_UPLOAD_PATTERN = Pattern.compile("var result = '(.+)';");
 	private static final int NUMBER_OF_RETRIES_ON_THROTTLE = 5;
 	private static final DateTimeFormatter MESSAGE_TIME_FORMATTER = DateTimeFormatter.ofPattern("hh:mm a").withZone(ZoneOffset.UTC);
 	private static final int EDIT_WINDOW_SECONDS = 115;
 	private static final int WEB_SOCKET_RESTART_SECONDS = 30;
 	private static final int MAX_CHAT_MESSAGE_LENGTH = 500;
-	
+
 	private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
 	private final ExecutorService eventExecutor = Executors.newCachedThreadPool();
 
@@ -88,7 +95,7 @@ public final class Room {
 	private Map<String, String> cookies;
 
 	private boolean hasLeft = false;
-	
+
 	private List<Long> pingableUserIds;
 	private Set<Long> currentUserIds = new HashSet<>();
 
@@ -111,16 +118,16 @@ public final class Room {
 		addEventListener(EventType.USER_ENTERED, e -> currentUserIds.add(e.getUserId()));
 		addEventListener(EventType.USER_LEFT, e -> currentUserIds.remove(e.getUserId()));
 	}
-	
+
 	private void executeAndSchedule(Runnable action, int rate) {
 		action.run();
 		executor.scheduleAtFixedRate(action, rate, rate, TimeUnit.HOURS);
 	}
-	
+
 	private JsonElement post(String url, String... data) {
 		return post(NUMBER_OF_RETRIES_ON_THROTTLE, url, data);
 	}
-	
+
 	private JsonElement post(int retryCount, String url, String... data) {
 		Response response;
 		try {
@@ -192,7 +199,7 @@ public final class Room {
 			throw new ChatOperationException("Cannot connect to chat websocket", e);
 		}
 	}
-	
+
 	private void closeWebSocket() {
 		try {
 			webSocketSession.close();
@@ -225,7 +232,7 @@ public final class Room {
 		@SuppressWarnings("unchecked") Consumer<Object> listenerCast = (Consumer<Object>) listener;
 		chatEventListeners.computeIfAbsent(eventCast, e -> new ArrayList<>()).add(listenerCast);
 	}
-	
+
 	private <T> CompletableFuture<T> supplyAsync(Supplier<T> supplier) {
 		return CompletableFuture.supplyAsync(supplier, executor).whenComplete((res, thr) -> {
 			if (res != null) LOGGER.trace("Task completed successfully with result: " + res);
@@ -255,6 +262,34 @@ public final class Room {
 			JsonElement element = post("http://chat." + host + "/chats/" + roomId + "/messages/new", "text", part);
 			LOGGER.debug("Message '{}' sent to room {}, raw result: {}", part, roomId, element);
 			return element.getAsJsonObject().get("id").getAsLong();
+		});
+	}
+
+	/**
+	 * Uploads the given file and returns the HTTP URL to the file hosted on imgur.
+	 * @param fileName Name of the file to upload.
+	 * @param inputStream Data.
+	 * @return Id of the posted message (which is going to be a one-box).
+	 */
+	public CompletableFuture<String> uploadImage(String fileName, InputStream inputStream) {
+		return CompletableFuture.supplyAsync(() -> {
+			Response response;
+			try {
+				response = httpClient.postWithFile("http://chat." + host + "/upload/image", cookies, "filename", fileName, inputStream);
+			} catch (IOException e) {
+				throw new ChatOperationException("Failed to upload image.", e);
+			}
+			String html = Jsoup.parse(response.body()).getElementsByTag("script").first().html();
+			Matcher failedUploadMatcher = FAILED_UPLOAD_PATTERN.matcher(html);
+			if (failedUploadMatcher.find()) {
+				throw new ChatOperationException(failedUploadMatcher.group(1));
+			}
+			Matcher successUploadMatcher = SUCCESS_UPLOAD_PATTERN.matcher(html);
+			if (successUploadMatcher.find()) {
+				return successUploadMatcher.group(1);
+			}
+			LOGGER.error("Tried to upload {} but couldn't parse result {}", fileName, html);
+			throw new ChatOperationException("Failed to upload image.");
 		});
 	}
 
@@ -309,17 +344,21 @@ public final class Room {
 	 * @return A future holding the id of the edited message (which is the same as the given message id).
 	 */
 	public CompletableFuture<Long> edit(long messageId, String message) {
-		LOGGER.info("Task added - editing message {} in room {}.", messageId, roomId);
-		return supplyAsync(() -> {
-			String result = post("http://chat." + host + "/messages/" + messageId, "text", message).getAsString();
-			LOGGER.debug("Message {} edited to '{}' in room {}, raw result: {}", messageId, message, roomId, result);
-			if (!SUCCESS.equals(result)) {
-				throw new ChatOperationException("Cannot edit message " + messageId + ". Reason: " + result);
-			}
-			return messageId;
-		});
+		if (isEditable(messageId)) {
+			LOGGER.info("Task added - editing message {} in room {}.", messageId, roomId);
+			return supplyAsync(() -> {
+				String result = post("http://chat." + host + "/messages/" + messageId, "text", message).getAsString();
+				LOGGER.debug("Message {} edited to '{}' in room {}, raw result: {}", messageId, message, roomId, result);
+				if (!SUCCESS.equals(result)) {
+					throw new ChatOperationException("Cannot edit message " + messageId + ". Reason: " + result);
+				}
+				return messageId;
+			});
+		} else {
+			return send(message);
+		}
 	}
-	
+
 	/**
 	 * Returns whether this message can be edited as of now. This doesn't guarantee that a subsequent call to {@link #edit(long, String)}
 	 * will be successful, because the time window allowed for the edit could have been passed by then. However, if a call to
@@ -391,7 +430,7 @@ public final class Room {
 		close();
 		hasLeft = true;
 	}
-	
+
 	/**
 	 * Retrieves the {@link Message} having the given id.
 	 * @param messageId Id of the message to fetch.
@@ -416,7 +455,7 @@ public final class Room {
 			throw new ChatOperationException(e);
 		}
 	}
-	
+
 	/**
 	 * Returns the list of all the pingable users of this room.
 	 * <p>This consists of all the users that have been in the room at least once for the past 14 days.
@@ -425,7 +464,7 @@ public final class Room {
 	public List<User> getPingableUsers() {
 		return getUsers(pingableUserIds, currentUserIds::contains);
 	}
-	
+
 	private void syncPingableUsers() {
 		String json;
 		try {
@@ -436,7 +475,7 @@ public final class Room {
 		JsonArray array = new JsonParser().parse(json).getAsJsonArray();
 		pingableUserIds = StreamSupport.stream(array.spliterator(), false).map(e -> e.getAsJsonArray().get(0).getAsLong()).collect(Collectors.toList());
 	}
-	
+
 	/**
 	 * Returns the list of all the current users of this room.
 	 * <p>This consists of all the users that are present, at the moment of this call, in the room.
@@ -445,7 +484,7 @@ public final class Room {
 	public List<User> getCurrentUsers() {
 		return getUsers(currentUserIds, id -> true);
 	}
-	
+
 	private void syncCurrentUsers() {
 		Document document;
 		try {
@@ -460,7 +499,7 @@ public final class Room {
 			currentUserIds.add(Long.valueOf(matcher.group(1)));
 		}
 	}
-	
+
 	/**
 	 * Retrieves the {@link User} having the given id.
 	 * @param messageId Id of the user to fetch.
@@ -469,7 +508,7 @@ public final class Room {
 	public User getUser(long userId) {
 		return getUsers(Arrays.asList(userId), currentUserIds::contains).get(0);
 	}
-	
+
 	private List<User> getUsers(Iterable<Long> userIds, LongPredicate inRoom) {
 		String ids = StreamSupport.stream(userIds.spliterator(), false).map(Object::toString).collect(Collectors.joining(","));
 		return StreamSupport.stream(post("http://chat." + host + "/user/info", "ids", ids, "roomId", String.valueOf(roomId)).getAsJsonObject().get("users").getAsJsonArray().spliterator(), false).map(JsonElement::getAsJsonObject).map(object -> {
@@ -493,7 +532,7 @@ public final class Room {
 	public long getRoomId() {
 		return roomId;
 	}
-	
+
 	/**
 	 * Returns the thumbs for this chat room. This includes various informations such as: name, description...
 	 * <p>Refer to {@link RoomThumbs} for a description of all the fields.
@@ -514,7 +553,7 @@ public final class Room {
 	/**
 	 * Returns the host of this room. Values are <code>stackoverflow.com</code>,
 	 * <code>stackexchange.com</code> and <code>meta.stackexchange.com</code>
-	 * 
+	 *
 	 * @return Host of this room.
 	 */
 	public String getHost() {
@@ -526,5 +565,34 @@ public final class Room {
 		eventExecutor.shutdown();
 		closeWebSocket();
 	}
+
+	public static void main(String[] args) throws IOException {
+		Properties properties = new Properties();
+		try (FileReader reader = new FileReader(System.getProperty("user.home") + "/chat.properties")) {
+			properties.load(reader);
+		} catch (IOException e) {
+			e.printStackTrace();
+			return;
+		}
+		StackExchangeClient client = new StackExchangeClient(properties.getProperty("email"), properties.getProperty("password"));
+		try {
+			CountDownLatch countDownLatch = new CountDownLatch(1);
+			Room room = client.joinRoom("stackoverflow.com", 111347);
+			try (FileInputStream fis = new FileInputStream("C:\\Users\\Guillaume\\Pictures\\burni.png")) {
+				room.uploadImage("a.png", fis);
+			}
+			room.addEventListener(EventType.MESSAGE_POSTED, e -> {
+				if (e.getMessage().getContent().equals("die")) {
+					countDownLatch.countDown();
+				}
+			});
+			try {
+				countDownLatch.await();
+			} catch (InterruptedException e1) { }
+		} finally {
+			client.close();
+		}
+	}
+
 
 }
