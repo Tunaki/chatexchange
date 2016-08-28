@@ -24,6 +24,7 @@ import java.util.Objects;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -245,7 +246,7 @@ public final class Room {
 	 * @param message Content of the message to send.
 	 * @return A future holding the id of the sent message.
 	 */
-	public CompletableFuture<Long> send(String message) {
+	public CompletionStage<Long> send(String message) {
 		LOGGER.info("Task added - sending message '{}' to room {}.", message, roomId);
 		List<String> parts = toParts(message, MAX_CHAT_MESSAGE_LENGTH);
 		// only return the id of the last message (this way, the 99.99% case of a single message works just as before)
@@ -271,7 +272,7 @@ public final class Room {
 	 * @param inputStream Data.
 	 * @return Id of the posted message (which is going to be a one-box).
 	 */
-	public CompletableFuture<String> uploadImage(String fileName, InputStream inputStream) {
+	public CompletionStage<String> uploadImage(String fileName, InputStream inputStream) {
 		return supplyAsync(() -> {
 			Response response;
 			try {
@@ -333,7 +334,7 @@ public final class Room {
 	 * @param message Message consisting of the reply.
 	 * @return A future holding the id of the newly sent message.
 	 */
-	public CompletableFuture<Long> replyTo(long messageId, String message) {
+	public CompletionStage<Long> replyTo(long messageId, String message) {
 		return send(":" + messageId + " " + message);
 	}
 
@@ -343,7 +344,7 @@ public final class Room {
 	 * @param message New content of the message.
 	 * @return A future holding the id of the edited message (which is the same as the given message id).
 	 */
-	public CompletableFuture<Long> edit(long messageId, String message) {
+	public CompletionStage<Long> edit(long messageId, String message) {
 		if (isEditable(messageId)) {
 			LOGGER.info("Task added - editing message {} in room {}.", messageId, roomId);
 			return supplyAsync(() -> {
@@ -383,7 +384,7 @@ public final class Room {
 	 * @param messageId Id of the message to delete.
 	 * @return A future holding no value.
 	 */
-	public CompletableFuture<Void> delete(long messageId) {
+	public CompletionStage<Void> delete(long messageId) {
 		LOGGER.info("Task added - deleting message {} in room {}.", messageId, roomId);
 		return supplyAsync(() -> {
 			String result = post("http://chat." + host + "/messages/" + messageId + "/delete").getAsString();
@@ -395,7 +396,7 @@ public final class Room {
 		});
 	}
 
-	public CompletableFuture<Void> toggleStar(long messageId) {
+	public CompletionStage<Void> toggleStar(long messageId) {
 		LOGGER.info("Task added - starring/unstarring message {} in room {}.", messageId, roomId);
 		return supplyAsync(() -> {
 			String result = post("http://chat." + host + "/messages/" + messageId + "/star").getAsString();
@@ -407,7 +408,7 @@ public final class Room {
 		});
 	}
 
-	public CompletableFuture<Void> togglePin(long messageId) {
+	public CompletionStage<Void> togglePin(long messageId) {
 		LOGGER.info("Task added - pining/unpining message {} in room {}.", messageId, roomId);
 		return supplyAsync(() -> {
 			String result = post("http://chat." + host + "/messages/" + messageId + "/owner-star").getAsString();
