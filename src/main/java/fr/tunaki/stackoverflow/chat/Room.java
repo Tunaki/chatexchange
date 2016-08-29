@@ -76,7 +76,7 @@ public final class Room {
 	private static final Pattern FAILED_UPLOAD_PATTERN = Pattern.compile("var error = '(.+)';");
 	private static final Pattern SUCCESS_UPLOAD_PATTERN = Pattern.compile("var result = '(.+)';");
 	private static final int NUMBER_OF_RETRIES_ON_THROTTLE = 5;
-	private static final DateTimeFormatter MESSAGE_TIME_FORMATTER = DateTimeFormatter.ofPattern("hh:mm a").withZone(ZoneOffset.UTC);
+	private static final DateTimeFormatter MESSAGE_TIME_FORMATTER = DateTimeFormatter.ofPattern("h:mm a").withZone(ZoneOffset.UTC);
 	private static final int EDIT_WINDOW_SECONDS = 115;
 	private static final int WEB_SOCKET_RESTART_SECONDS = 30;
 	private static final int MAX_CHAT_MESSAGE_LENGTH = 500;
