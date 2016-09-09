@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -19,9 +21,11 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -260,6 +264,26 @@ public final class Room {
 			JsonElement element = post(hostUrlBase + "/chats/" + roomId + "/messages/new", "text", part);
 			LOGGER.debug("Message '{}' sent to room {}, raw result: {}", part, roomId, element);
 			return element.getAsJsonObject().get("id").getAsLong();
+		});
+	}
+
+	/**
+	 * Uploads the given file and returns the HTTP URL to the file hosted on imgur.
+	 * @param fileName Name of the file to upload.
+	 * @param path Path of the file to upload.
+	 * @return URL of the uploaded image.
+	 */
+	public CompletionStage<String> uploadImage(String fileName, Path path) {
+		InputStream is;
+		try {
+			is = Files.newInputStream(path);
+		} catch (IOException e) {
+			throw new ChatOperationException("Can't open path " + path + " for reading.", e);
+		}
+		return uploadImage(fileName, is).whenComplete((url, t) -> {
+			try {
+				is.close();
+			} catch (IOException e) { }
 		});
 	}
 
