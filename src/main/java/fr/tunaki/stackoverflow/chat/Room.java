@@ -1,7 +1,5 @@
 package fr.tunaki.stackoverflow.chat;
 
-import java.io.FileInputStream;
-import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -21,11 +19,9 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -89,8 +85,8 @@ public final class Room {
 	private Map<EventType<Object>, List<Consumer<Object>>> chatEventListeners = new HashMap<>();
 
 	private long roomId;
-	private String host;
-	private String fkey;
+	private ChatHost host;
+	private String fkey, hostUrlBase;
 
 	private HttpClient httpClient;
 	private Map<String, String> cookies;
@@ -100,9 +96,10 @@ public final class Room {
 	private List<Long> pingableUserIds;
 	private Set<Long> currentUserIds = new HashSet<>();
 
-	Room(String host, long roomId, HttpClient httpClient, Map<String, String> cookies) {
+	Room(ChatHost host, long roomId, HttpClient httpClient, Map<String, String> cookies) {
 		this.roomId = roomId;
 		this.host = host;
+		hostUrlBase = "http://chat." + host.getName();
 		this.httpClient = httpClient;
 		this.cookies = new HashMap<>(cookies);
 		executeAndSchedule(() -> fkey = retrieveFKey(roomId), 1);
@@ -163,7 +160,7 @@ public final class Room {
 
 	private String retrieveFKey(long roomId) {
 		try {
-			Response response = httpClient.get("http://chat." + host + "/rooms/" + roomId, cookies);
+			Response response = httpClient.get(hostUrlBase + "/rooms/" + roomId, cookies);
 			String fkey = response.parse().getElementById("fkey").val();
 			LOGGER.debug("New fkey retrieved for room {}", roomId);
 			return fkey;
@@ -173,14 +170,14 @@ public final class Room {
 	}
 
 	private void startWebSocket() {
-		String websocketUrl = post("http://chat." + host + "/ws-auth", "roomid", String.valueOf(roomId)).getAsJsonObject().get("url").getAsString();
-		String time = post("http://chat." + host + "/chats/" + roomId + "/events").getAsJsonObject().get("time").getAsString();
+		String websocketUrl = post(hostUrlBase + "/ws-auth", "roomid", String.valueOf(roomId)).getAsJsonObject().get("url").getAsString();
+		String time = post(hostUrlBase + "/chats/" + roomId + "/events").getAsJsonObject().get("time").getAsString();
 		ClientManager client = ClientManager.createClient(JdkClientContainer.class.getName());
 		Builder configBuilder = ClientEndpointConfig.Builder.create();
 		configBuilder.configurator(new Configurator() {
 			@Override
 			public void beforeRequest(Map<String, List<String>> headers) {
-				headers.put("Origin", Arrays.asList("http://chat." + host));
+				headers.put("Origin", Arrays.asList(hostUrlBase));
 			}
 		});
 		websocketUrl += "?l=" + time;
@@ -253,14 +250,14 @@ public final class Room {
 		for (int i = 0; i < parts.size() - 1; i++) {
 			String part = parts.get(i);
 			supplyAsync(() -> {
-				JsonElement element = post("http://chat." + host + "/chats/" + roomId + "/messages/new", "text", part);
+				JsonElement element = post(hostUrlBase + "/chats/" + roomId + "/messages/new", "text", part);
 				LOGGER.debug("Message '{}' sent to room {}, raw result: {}", part, roomId, element);
 				return element.getAsJsonObject().get("id").getAsLong();
 			});
 		}
 		String part = parts.get(parts.size() - 1);
 		return supplyAsync(() -> {
-			JsonElement element = post("http://chat." + host + "/chats/" + roomId + "/messages/new", "text", part);
+			JsonElement element = post(hostUrlBase + "/chats/" + roomId + "/messages/new", "text", part);
 			LOGGER.debug("Message '{}' sent to room {}, raw result: {}", part, roomId, element);
 			return element.getAsJsonObject().get("id").getAsLong();
 		});
@@ -268,15 +265,17 @@ public final class Room {
 
 	/**
 	 * Uploads the given file and returns the HTTP URL to the file hosted on imgur.
+	 * <p>This method is asynchronous, thus, if the given input stream needs to be closed, make sure to properly close it in a
+	 * {@link CompletionStage#whenComplete(java.util.function.BiConsumer)} callback on the returned stage.
 	 * @param fileName Name of the file to upload.
 	 * @param inputStream Data.
-	 * @return Id of the posted message (which is going to be a one-box).
+	 * @return URL of the uploaded image.
 	 */
 	public CompletionStage<String> uploadImage(String fileName, InputStream inputStream) {
 		return supplyAsync(() -> {
 			Response response;
 			try {
-				response = httpClient.postWithFile("http://chat." + host + "/upload/image", cookies, "filename", fileName, inputStream);
+				response = httpClient.postWithFile(hostUrlBase + "/upload/image", cookies, "filename", fileName, inputStream);
 			} catch (IOException e) {
 				throw new ChatOperationException("Failed to upload image.", e);
 			}
@@ -348,7 +347,7 @@ public final class Room {
 		if (isEditable(messageId)) {
 			LOGGER.info("Task added - editing message {} in room {}.", messageId, roomId);
 			return supplyAsync(() -> {
-				String result = post("http://chat." + host + "/messages/" + messageId, "text", message).getAsString();
+				String result = post(hostUrlBase + "/messages/" + messageId, "text", message).getAsString();
 				LOGGER.debug("Message {} edited to '{}' in room {}, raw result: {}", messageId, message, roomId, result);
 				if (!SUCCESS.equals(result)) {
 					throw new ChatOperationException("Cannot edit message " + messageId + ". Reason: " + result);
@@ -371,7 +370,7 @@ public final class Room {
 	 */
 	public boolean isEditable(long messageId) {
 		try {
-			Document documentHistory = httpClient.get("http://chat." + host + "/messages/" + messageId + "/history", cookies, "fkey", fkey).parse();
+			Document documentHistory = httpClient.get(hostUrlBase + "/messages/" + messageId + "/history", cookies, "fkey", fkey).parse();
 			LocalTime time = LocalTime.parse(documentHistory.getElementsByClass("timestamp").last().html(), MESSAGE_TIME_FORMATTER);
 			return ChronoUnit.SECONDS.between(time, LocalTime.now(ZoneOffset.UTC)) < EDIT_WINDOW_SECONDS;
 		} catch (IOException e) {
@@ -387,7 +386,7 @@ public final class Room {
 	public CompletionStage<Void> delete(long messageId) {
 		LOGGER.info("Task added - deleting message {} in room {}.", messageId, roomId);
 		return supplyAsync(() -> {
-			String result = post("http://chat." + host + "/messages/" + messageId + "/delete").getAsString();
+			String result = post(hostUrlBase + "/messages/" + messageId + "/delete").getAsString();
 			LOGGER.debug("Message {} deleted in room {}, raw result: {}", messageId, roomId, result);
 			if (!SUCCESS.equals(result)) {
 				throw new ChatOperationException("Cannot delete message " + messageId + ". Reason: " + result);
@@ -396,10 +395,16 @@ public final class Room {
 		});
 	}
 
+	/**
+	 * Stars or unstars the given message. This method acts like a toggle, by starring the message if this user didn't star it
+	 * before, or by unstarring it if this user starred it before.
+	 * @param messageId Id of the message to star / unstar.
+	 * @return A future holding no value.
+	 */
 	public CompletionStage<Void> toggleStar(long messageId) {
 		LOGGER.info("Task added - starring/unstarring message {} in room {}.", messageId, roomId);
 		return supplyAsync(() -> {
-			String result = post("http://chat." + host + "/messages/" + messageId + "/star").getAsString();
+			String result = post(hostUrlBase + "/messages/" + messageId + "/star").getAsString();
 			LOGGER.debug("Message {} starred/unstarred in room {}, raw result: {}", messageId, roomId, result);
 			if (!SUCCESS.equals(result)) {
 				throw new ChatOperationException("Cannot star/unstar message " + messageId + ". Reason: " + result);
@@ -408,10 +413,16 @@ public final class Room {
 		});
 	}
 
+	/**
+	 * Pins or unpins the given message. This method acts like a toggle, by pinning the message if this user didn't pin it
+	 * before, or by unpinning it if this user pin it before.
+	 * @param messageId Id of the message to pin / unpin.
+	 * @return A future holding no value.
+	 */
 	public CompletionStage<Void> togglePin(long messageId) {
 		LOGGER.info("Task added - pining/unpining message {} in room {}.", messageId, roomId);
 		return supplyAsync(() -> {
-			String result = post("http://chat." + host + "/messages/" + messageId + "/owner-star").getAsString();
+			String result = post(hostUrlBase + "/messages/" + messageId + "/owner-star").getAsString();
 			LOGGER.debug("Message {} pined/unpined in room {}, raw result: {}", messageId, roomId, result);
 			if (!SUCCESS.equals(result)) {
 				throw new ChatOperationException("Cannot pin/unpin message " + messageId + ". Reason: " + result);
@@ -427,7 +438,7 @@ public final class Room {
 	public void leave() {
 		if (hasLeft) return;
 		LOGGER.debug("Leaving room {} on {}", roomId, host);
-		post("http://chat." + host + "/chats/leave/" + roomId, "quiet", "true");
+		post(hostUrlBase + "/chats/leave/" + roomId, "quiet", "true");
 		close();
 		hasLeft = true;
 	}
@@ -439,9 +450,9 @@ public final class Room {
 	 */
 	public Message getMessage(long messageId) {
 		try {
-			String plainContent = httpClient.get("http://chat." + host + "/message/" + messageId, cookies, "fkey", fkey, "plain", "true").body();
-			String content = httpClient.get("http://chat." + host + "/message/" + messageId, cookies, "fkey", fkey, "plain", "false").body();
-			Document documentHistory = httpClient.get("http://chat." + host + "/messages/" + messageId + "/history", cookies, "fkey", fkey).parse();
+			String plainContent = httpClient.get(hostUrlBase + "/message/" + messageId, cookies, "fkey", fkey, "plain", "true").body();
+			String content = httpClient.get(hostUrlBase + "/message/" + messageId, cookies, "fkey", fkey, "plain", "false").body();
+			Document documentHistory = httpClient.get(hostUrlBase + "/messages/" + messageId + "/history", cookies, "fkey", fkey).parse();
 			User user = getUser(Long.parseLong(documentHistory.select(".username > a").first().attr("href").split("/")[2]));
 			boolean deleted = documentHistory.select(".message .content").stream().anyMatch(e -> e.getElementsByTag("b").html().equals("deleted"));
 			return new Message(messageId, user, plainContent, content, deleted);
@@ -469,7 +480,7 @@ public final class Room {
 	private void syncPingableUsers() {
 		String json;
 		try {
-			json = httpClient.get("http://chat." + host + "/rooms/pingable/" + roomId, cookies).body();
+			json = httpClient.get(hostUrlBase + "/rooms/pingable/" + roomId, cookies).body();
 		} catch (IOException e) {
 			throw new ChatOperationException(e);
 		}
@@ -489,7 +500,7 @@ public final class Room {
 	private void syncCurrentUsers() {
 		Document document;
 		try {
-			document = httpClient.get("http://chat." + host + "/rooms/" + roomId, cookies).parse();
+			document = httpClient.get(hostUrlBase + "/rooms/" + roomId, cookies).parse();
 		} catch (IOException e) {
 			throw new ChatOperationException(e);
 		}
@@ -512,7 +523,7 @@ public final class Room {
 
 	private List<User> getUsers(Iterable<Long> userIds, LongPredicate inRoom) {
 		String ids = StreamSupport.stream(userIds.spliterator(), false).map(Object::toString).collect(Collectors.joining(","));
-		return StreamSupport.stream(post("http://chat." + host + "/user/info", "ids", ids, "roomId", String.valueOf(roomId)).getAsJsonObject().get("users").getAsJsonArray().spliterator(), false).map(JsonElement::getAsJsonObject).map(object -> {
+		return StreamSupport.stream(post(hostUrlBase + "/user/info", "ids", ids, "roomId", String.valueOf(roomId)).getAsJsonObject().get("users").getAsJsonArray().spliterator(), false).map(JsonElement::getAsJsonObject).map(object -> {
 			long id = object.get("id").getAsLong();
 			String userName = object.get("name").getAsString();
 			int reputation = object.get("reputation").getAsInt();
@@ -542,7 +553,7 @@ public final class Room {
 	public RoomThumbs getThumbs() {
 		String json;
 		try {
-			json = httpClient.get("http://chat." + host + "/rooms/thumbs/" + roomId, cookies).body();
+			json = httpClient.get(hostUrlBase + "/rooms/thumbs/" + roomId, cookies).body();
 		} catch (IOException e) {
 			throw new ChatOperationException(e);
 		}
@@ -552,12 +563,10 @@ public final class Room {
 	}
 
 	/**
-	 * Returns the host of this room. Values are <code>stackoverflow.com</code>,
-	 * <code>stackexchange.com</code> and <code>meta.stackexchange.com</code>
-	 *
+	 * Returns the host of this room.
 	 * @return Host of this room.
 	 */
-	public String getHost() {
+	public ChatHost getHost() {
 		return host;
 	}
 
@@ -566,34 +575,5 @@ public final class Room {
 		eventExecutor.shutdown();
 		closeWebSocket();
 	}
-
-	public static void main(String[] args) throws IOException {
-		Properties properties = new Properties();
-		try (FileReader reader = new FileReader(System.getProperty("user.home") + "/chat.properties")) {
-			properties.load(reader);
-		} catch (IOException e) {
-			e.printStackTrace();
-			return;
-		}
-		StackExchangeClient client = new StackExchangeClient(properties.getProperty("email"), properties.getProperty("password"));
-		try {
-			CountDownLatch countDownLatch = new CountDownLatch(1);
-			Room room = client.joinRoom("stackoverflow.com", 111347);
-			try (FileInputStream fis = new FileInputStream("C:\\Users\\Guillaume\\Pictures\\burni.png")) {
-				room.uploadImage("a.png", fis);
-			}
-			room.addEventListener(EventType.MESSAGE_POSTED, e -> {
-				if (e.getMessage().getContent().equals("die")) {
-					countDownLatch.countDown();
-				}
-			});
-			try {
-				countDownLatch.await();
-			} catch (InterruptedException e1) { }
-		} finally {
-			client.close();
-		}
-	}
-
 
 }

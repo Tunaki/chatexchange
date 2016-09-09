@@ -15,19 +15,29 @@ import org.jsoup.nodes.Document;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class StackExchangeClient {
-	
+/**
+ * Client used to authenticate with Stack Exchange. To properly dispose of this client once created, it is expected to be
+ * closed by invoking the {@link #close()} method.
+ * @author Tunaki
+ */
+public class StackExchangeClient implements AutoCloseable {
+
 	private static final Logger LOGGER = LoggerFactory.getLogger(StackExchangeClient.class);
 
 	private static final Pattern OPEN_ID_PROVIDER_PATTERN = Pattern.compile("(https://openid.stackexchange.com/user/.*?)\"");
 
 	private String openIdProvider;
-	
+
 	private HttpClient httpClient;
 	private Map<String, String> cookies = new HashMap<>();
 
 	private List<Room> rooms = new ArrayList<>();
 
+	/**
+	 * Constructs the client with the provided credentials. Those will be the credentials used to send messages.
+	 * @param email Email of the account to connect with.
+	 * @param password Password of the account to connect with.
+	 */
 	public StackExchangeClient(String email, String password) {
 		httpClient = new HttpClient();
 		try {
@@ -54,13 +64,20 @@ public class StackExchangeClient {
 		openIdProvider = matcher.group(1);
 	}
 
-	public Room joinRoom(String host, long roomId) {
+	/**
+	 * Joins the given room for the given chat host.
+	 * <p>Trying to join a room in which you are already in results in a <code>ChatOperationException</code>.
+	 * @param host Host of the chat room to join.
+	 * @param roomId Id of the room to join.
+	 * @return <code>Room</code> joined.
+	 */
+	public Room joinRoom(ChatHost host, long roomId) {
 		if (rooms.stream().anyMatch(r -> r.getHost().equals(host) && r.getRoomId() == roomId)) {
 			throw new ChatOperationException("Cannot join a room you are already in.");
 		}
 		if (rooms.stream().allMatch(r -> !r.getHost().equals(host))) {
 			try {
-				siteLogin(host);
+				siteLogin(host.getName());
 			} catch (IOException e) {
 				throw new UncheckedIOException(e);
 			}
@@ -74,7 +91,7 @@ public class StackExchangeClient {
 		Response response = httpClient.get("http://" + host + "/users/login?returnurl=" + URLEncoder.encode("http://" + host + "/", "UTF-8"), cookies);
 		String fkey = response.parse().select("input[name='fkey']").val();
 		response = httpClient.post("http://" + host + "/users/authenticate", cookies, "fkey", fkey, "openid_identifier", openIdProvider);
-		
+
 		// confirmation prompt?
 		if (response.url().toString().startsWith("https://openid.stackexchange.com/account/prompt")) {
 			Document document = response.parse();
@@ -84,7 +101,7 @@ public class StackExchangeClient {
 			Response promptResponse = httpClient.post("https://openid.stackexchange.com/account/prompt/submit", cookies, "session", session, "fkey", fkey);
 			LOGGER.trace("Confirmation prompt response \n" + promptResponse.parse().html());
 		}
-		
+
 		// check logged in
 		Response checkResponse = httpClient.get("http://" + host + "/users/current", cookies);
 		if (checkResponse.parse().getElementsByClass("reputation").first() == null) {
@@ -92,7 +109,12 @@ public class StackExchangeClient {
 			throw new IllegalStateException("Unable to login to Stack Exchange.");
 		}
 	}
-	
+
+	/**
+	 * Closes this client by making the logged-in user leave all the chat rooms they joined.
+	 * <p>Multiple invocations of this method has no further effect.
+	 */
+	@Override
 	public void close() {
 		rooms.forEach(Room::leave);
 	}
