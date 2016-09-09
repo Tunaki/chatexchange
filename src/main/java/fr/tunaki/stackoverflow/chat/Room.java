@@ -344,19 +344,15 @@ public final class Room {
 	 * @return A future holding the id of the edited message (which is the same as the given message id).
 	 */
 	public CompletionStage<Long> edit(long messageId, String message) {
-		if (isEditable(messageId)) {
-			LOGGER.info("Task added - editing message {} in room {}.", messageId, roomId);
-			return supplyAsync(() -> {
-				String result = post(hostUrlBase + "/messages/" + messageId, "text", message).getAsString();
-				LOGGER.debug("Message {} edited to '{}' in room {}, raw result: {}", messageId, message, roomId, result);
-				if (!SUCCESS.equals(result)) {
-					throw new ChatOperationException("Cannot edit message " + messageId + ". Reason: " + result);
-				}
-				return messageId;
-			});
-		} else {
-			return send(message);
-		}
+		LOGGER.info("Task added - editing message {} in room {}.", messageId, roomId);
+		return supplyAsync(() -> {
+			String result = post(hostUrlBase + "/messages/" + messageId, "text", message).getAsString();
+			LOGGER.debug("Message {} edited to '{}' in room {}, raw result: {}", messageId, message, roomId, result);
+			if (!SUCCESS.equals(result)) {
+				throw new ChatOperationException("Cannot edit message " + messageId + ". Reason: " + result);
+			}
+			return messageId;
+		});
 	}
 
 	/**
