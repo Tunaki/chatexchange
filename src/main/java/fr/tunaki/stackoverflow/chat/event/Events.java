@@ -20,13 +20,13 @@ import fr.tunaki.stackoverflow.chat.Room;
  * @author Tunaki
  */
 public final class Events {
-	
+
 	private Events() { }
-	
+
 	/**
 	 * Transforms the raw chat events to a list of event instances, with their corresponding data.
 	 * @param events Raw chat events, as returned the the StackExchange chat websockets.
-	 * @param roomId Id of the room to return events from.
+	 * @param room Room to return events from.
 	 * @return List of events with their data.
 	 */
 	public static List<Event> fromJsonData(JsonArray events, Room room) {
@@ -54,11 +54,11 @@ public final class Events {
 					}
 				}).filter(Objects::nonNull).collect(Collectors.toList());
 	}
-	
+
 	private static Stream<JsonObject> jsonObjects(JsonArray array) {
 		return StreamSupport.stream(array.spliterator(), false).map(JsonElement::getAsJsonObject);
 	}
-	
+
 	private static Message getMessage(Room room, JsonObject object) {
 		return room.getMessage(object.get("message_id").getAsLong());
 	}

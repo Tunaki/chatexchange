@@ -21,11 +21,9 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -228,6 +226,7 @@ public final class Room {
 	 * <p>All listeners bound to a specific event will be called when the corresponding event is raised.
 	 * @param event Event to listen to.
 	 * @param listener Listener to add to this event.
+	 * @param <T> type of the event.
 	 */
 	public <T> void addEventListener(EventType<T> event, Consumer<T> listener) {
 		@SuppressWarnings("unchecked") EventType<Object> eventCast = (EventType<Object>) event;
@@ -534,7 +533,7 @@ public final class Room {
 
 	/**
 	 * Retrieves the {@link User} having the given id.
-	 * @param messageId Id of the user to fetch.
+	 * @param userId Id of the user to fetch.
 	 * @return User with the given id.
 	 */
 	public User getUser(long userId) {
