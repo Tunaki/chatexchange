@@ -1,7 +1,7 @@
 package fr.tunaki.stackoverflow.chat.event;
 
 enum StackExchangeEventType {
-	
+
     MESSAGE_POSTED(1),
     MESSAGE_EDITED(2),
     USER_ENTERED(3),
@@ -25,7 +25,8 @@ enum StackExchangeEventType {
     TIME_BREAK(21),
     FEED_TICKER(22),
     USER_SUSPENDED(29),
-    USER_MERGED(30);
+    USER_MERGED(30),
+    USER_NAME_OR_AVATAR_CHANGED(34);
 
 	private final int code;
 
