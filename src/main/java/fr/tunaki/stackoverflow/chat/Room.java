@@ -268,18 +268,17 @@ public final class Room {
 
 	/**
 	 * Uploads the given file and returns the HTTP URL to the file hosted on imgur.
-	 * @param fileName Name of the file to upload.
 	 * @param path Path of the file to upload.
 	 * @return URL of the uploaded image.
 	 */
-	public CompletionStage<String> uploadImage(String fileName, Path path) {
+	public CompletionStage<String> uploadImage(Path path) {
 		InputStream is;
 		try {
 			is = Files.newInputStream(path);
 		} catch (IOException e) {
 			throw new ChatOperationException("Can't open path " + path + " for reading.", e);
 		}
-		return uploadImage(fileName, is).whenComplete((url, t) -> {
+		return uploadImage(path.getFileName().toString(), is).whenComplete((url, t) -> {
 			try {
 				is.close();
 			} catch (IOException e) { }

@@ -38,4 +38,4 @@ Once you have a `Room` object, you can use it to send messages or reply to other
 
 Each method in the `Room` class runs asynchronously and returns a [`CompletionStage`](https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/CompletionStage.html) that holds the result of the action. Sending a message or replying to a message returns a `CompletionStage<Long>` holding the id of the posted message. This allows for fluid method calls, like uploading an image and posting it as a one-box:
 
-    room.uploadImage(fileName, Paths.get(pathToImage)).thenAccept(room::send);
+    room.uploadImage(Paths.get(pathToImage)).thenAccept(room::send);
