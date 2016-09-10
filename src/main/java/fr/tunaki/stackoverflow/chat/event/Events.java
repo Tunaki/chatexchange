@@ -34,14 +34,12 @@ public final class Events {
 		if (events.size() == 2 && jsonObjects(events).anyMatch(o -> getEventType(o) == 4) && jsonObjects(events).anyMatch(o -> getEventType(o) == 15)) {
 			return new ArrayList<>(Arrays.asList(new KickedEvent(events)));
 		}
-		return jsonObjects(events).filter(object -> object.get("room_id").getAsLong() == room.getRoomId())
+		// TODO: handle Feeds (user_id = -2)
+		return jsonObjects(events)
+				.filter(object -> object.get("user_id").getAsLong() > 0 && object.get("room_id").getAsLong() == room.getRoomId())
 				.map(object -> {
 					switch (getEventType(object)) {
-					case 1:
-						if (object.get("user_id").getAsLong() > 0) {
-							return new MessagePostedEvent(object, getMessage(room, object));
-						}
-						return null;
+					case 1: return new MessagePostedEvent(object, getMessage(room, object));
 					case 2: return new MessageEditedEvent(object, getMessage(room, object));
 					case 3: return new UserEnteredEvent(object);
 					case 4: return new UserLeftEvent(object);
