@@ -27,7 +27,7 @@ Start by creating a `StackExchangeClient`; this is the class used to authenticat
 
     StackExchangeClient client = new StackExchangeClient(emailAddress, password);
 
-**The client must be closed to log-out.** With the client, you can then join any chat room by invoking the `joinRoom` method, taking as first parameter the host of the chat server and, as second parameter, the id of the room to join.
+**The client must be closed to log-out**, by invoking `client.close()`. With the client, you can then join any chat room by invoking the `joinRoom` method, taking as first parameter the host of the chat server and, as second parameter, the id of the room to join.
 
     Room room = client.joinRoom(ChatHost.STACK_OVERFLOW, roomId);
 
