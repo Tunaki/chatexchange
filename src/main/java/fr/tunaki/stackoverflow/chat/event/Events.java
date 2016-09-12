@@ -36,7 +36,7 @@ public final class Events {
 		}
 		// TODO: handle Feeds (user_id = -2)
 		return jsonObjects(events)
-				.filter(object -> object.get("user_id").getAsLong() > 0 && object.get("room_id").getAsLong() == room.getRoomId())
+				.filter(object -> (!object.has("user_id") || object.get("user_id").getAsLong() > 0) && object.get("room_id").getAsLong() == room.getRoomId())
 				.map(object -> {
 					switch (getEventType(object)) {
 					case 1: return new MessagePostedEvent(object, getMessage(room, object));
