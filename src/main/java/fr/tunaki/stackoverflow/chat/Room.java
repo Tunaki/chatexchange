@@ -17,7 +17,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -322,13 +321,17 @@ public final class Room {
 		List<String> messages = new ArrayList<>();
 		while (message.length() > maxPartLength) {
 			List<Integer[]> nonBreakingIndexes = identifyNonBreakingIndexes(message);
-			int potentialBreakIndex = message.lastIndexOf(' ', maxPartLength), breakIndex = potentialBreakIndex;
-			for (Iterator<Integer[]> it = nonBreakingIndexes.iterator(); it.hasNext();) {
-				Integer[] bounds = it.next();
-				if (bounds[0] < potentialBreakIndex && potentialBreakIndex < bounds[1]) {
+			int breakIndex = message.lastIndexOf(' ', maxPartLength);
+			if (breakIndex < 0) breakIndex = maxPartLength; // 500 chars with no space =/, let's try to break at the max possible
+			for (Integer[] bounds : nonBreakingIndexes) {
+				if (bounds[0] < breakIndex && breakIndex < bounds[1]) {
 					breakIndex = bounds[0] - 1;
 					break;
 				}
+			}
+			if (breakIndex < 0) {
+				// we did our best, but this part starts with a non breaking index, and ends further than what is allowed...
+				throw new ChatOperationException("Cannot send message: it is longer than " + maxPartLength + " characters and cannot be broken into adequate parts");
 			}
 			messages.add(message.substring(0, breakIndex));
 			message = message.substring(breakIndex + 1);
