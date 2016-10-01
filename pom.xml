@@ -20,8 +20,8 @@
   <distributionManagement>
     <repository>
       <id>internal.repo</id>
-      <name>Temporary Staging Repository</name>
       <url>file://${project.build.directory}/mvn-repo</url>
+      <uniqueVersion>false</uniqueVersion>
     </repository>
   </distributionManagement>
   <build>
