@@ -3,6 +3,8 @@
   <groupId>fr.tunaki.stackoverflow</groupId>
   <artifactId>chatexchange</artifactId>
   <version>1.0.1-SNAPSHOT</version>
+  <name>ChatExchange</name>
+  <description>Simple API to interact with the chat system on Stack Overflow, and the Stack Exchange network.</description>
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <github.global.server>github</github.global.server>
