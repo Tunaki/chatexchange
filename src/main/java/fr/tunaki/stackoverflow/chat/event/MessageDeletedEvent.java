@@ -2,7 +2,7 @@ package fr.tunaki.stackoverflow.chat.event;
 
 import com.google.gson.JsonElement;
 
-import fr.tunaki.stackoverflow.chat.Message;
+import fr.tunaki.stackoverflow.chat.Room;
 
 /**
  * Holds the data for a deleted message event.
@@ -10,8 +10,8 @@ import fr.tunaki.stackoverflow.chat.Message;
  */
 public class MessageDeletedEvent extends MessageEvent {
 
-	MessageDeletedEvent(JsonElement jsonElement, Message message) {
-		super(jsonElement, message);
+	MessageDeletedEvent(JsonElement jsonElement, Room room) {
+		super(jsonElement, room);
 	}
 
 }

@@ -6,26 +6,32 @@ package fr.tunaki.stackoverflow.chat;
  * a formatted content is the rendered HTML of the message. For example, a formatted cv-pls message will contain
  * an anchor (linking to the tag page for cv-pls) and the corresponding plain message will contain <code>[tag:cv-pls]</code> instead.
  * <p>A message is inherently linked to a chat room: an instance of {@link Message} can only be obtained by calling {@link Room#getMessage(long)},
- * by giving it the id of the message to look for. 
+ * by giving it the id of the message to look for.
  * <p>A message also contains a reference to the user that posted it. Refer to {@link User}.
  * <p>When a message is deleted, its content and user will always be <code>null</code>, except if the current user is room-owner
  * or it is one of their own message.
  * @author Tunaki.
  */
 public final class Message {
-	
+
 	private long id;
 	private User user;
 	private String plainContent;
 	private String content;
 	private boolean deleted;
-	
-	Message(long id, User user, String plainContent, String content, boolean deleted) {
+	private int starCount;
+	private boolean pinned;
+	private int editCount;
+
+	Message(long id, User user, String plainContent, String content, boolean deleted, int starCount, boolean pinned, int editCount) {
 		this.id = id;
 		this.user = user;
 		this.plainContent = plainContent;
 		this.content = content;
 		this.deleted = deleted;
+		this.starCount = starCount;
+		this.pinned = pinned;
+		this.editCount = editCount;
 	}
 
 	/**
@@ -70,5 +76,29 @@ public final class Message {
 	public boolean isDeleted() {
 		return deleted;
 	}
-	
+
+	/**
+	 * Returns the number of stars this message has.
+	 * @return Number of times this message was starred.
+	 */
+	public int getStarCount() {
+		return starCount;
+	}
+
+	/**
+	 * Tells whether this message is pinned.
+	 * @return Is this message pinned?
+	 */
+	public boolean isPinned() {
+		return pinned;
+	}
+
+	/**
+	 * Returns the number of times this message was edited. For messages that were not edited (i.e. just posted), it returns 0.
+	 * @return Number of times this message was edited.
+	 */
+	public int getEditCount() {
+		return editCount;
+	}
+
 }

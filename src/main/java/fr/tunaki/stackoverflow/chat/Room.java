@@ -50,6 +50,7 @@ import org.jsoup.HttpStatusException;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
+import org.jsoup.select.Elements;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -85,7 +86,7 @@ public final class Room {
 	private LocalDateTime lastWebsocketMessageDate = LocalDateTime.now();
 	private Map<EventType<Object>, List<Consumer<Object>>> chatEventListeners = new HashMap<>();
 
-	private long roomId;
+	private int roomId;
 	private ChatHost host;
 	private String fkey, hostUrlBase;
 
@@ -97,7 +98,7 @@ public final class Room {
 	private List<Long> pingableUserIds;
 	private Set<Long> currentUserIds = new HashSet<>();
 
-	Room(ChatHost host, long roomId, HttpClient httpClient, Map<String, String> cookies) {
+	Room(ChatHost host, int roomId, HttpClient httpClient, Map<String, String> cookies) {
 		this.roomId = roomId;
 		this.host = host;
 		hostUrlBase = "http://chat." + host.getName();
@@ -159,7 +160,7 @@ public final class Room {
 		return dataWithFKey;
 	}
 
-	private String retrieveFKey(long roomId) {
+	private String retrieveFKey(int roomId) {
 		try {
 			Response response = httpClient.get(hostUrlBase + "/rooms/" + roomId, cookies);
 			String fkey = response.parse().getElementById("fkey").val();
@@ -470,23 +471,36 @@ public final class Room {
 	 * @return Message with the given id.
 	 */
 	public Message getMessage(long messageId) {
+		Document documentHistory;
+		String content;
 		try {
-			String plainContent = httpClient.get(hostUrlBase + "/message/" + messageId, cookies, "fkey", fkey, "plain", "true").body();
-			String content = httpClient.get(hostUrlBase + "/message/" + messageId, cookies, "fkey", fkey, "plain", "false").body();
-			Document documentHistory = httpClient.get(hostUrlBase + "/messages/" + messageId + "/history", cookies, "fkey", fkey).parse();
-			User user = getUser(Long.parseLong(documentHistory.select(".username > a").first().attr("href").split("/")[2]));
-			boolean deleted = documentHistory.select(".message .content").stream().anyMatch(e -> e.getElementsByTag("b").html().equals("deleted"));
-			return new Message(messageId, user, plainContent, content, deleted);
+			documentHistory = httpClient.get(hostUrlBase + "/messages/" + messageId + "/history", cookies, "fkey", fkey).parse();
+			content = httpClient.get(hostUrlBase + "/message/" + messageId, cookies, "fkey", fkey).body();
 		} catch (HttpStatusException e) {
 			if (e.getStatusCode() == 404) {
 				LOGGER.info("Tried to view deleted message " + messageId);
 				// non-RO cannot see deleted message of another user: so if 404, it means message is deleted
-				return new Message(messageId, null, null, null, true);
+				return new Message(messageId, null, null, null, true, 0, false, 0);
 			}
 			throw new ChatOperationException(e);
 		} catch (IOException e) {
 			throw new ChatOperationException(e);
 		}
+		Elements contents = documentHistory.select(".messages .content");
+		String plainContent = contents.get(1).ownText();
+		Element starVoteContainer = documentHistory.select(".messages .flash .stars.vote-count-container").first();
+		int starCount;
+		if (starVoteContainer == null) {
+			starCount = 0;
+		} else {
+			Element times = starVoteContainer.select(".times").first();
+			starCount = times == null || !times.hasText() ? 1 : Integer.parseInt(times.text());
+		}
+		boolean pinned = !documentHistory.select(".vote-count-container.stars.owner-star").isEmpty();
+		int editCount = contents.size() - 2; // -2 to remove the current version and the first version
+		User user = getUser(Long.parseLong(documentHistory.select(".username > a").first().attr("href").split("/")[2]));
+		boolean deleted = contents.stream().anyMatch(e -> e.getElementsByTag("b").html().equals("deleted"));
+		return new Message(messageId, user, plainContent, content, deleted, starCount, pinned, editCount);
 	}
 
 	/**
@@ -562,7 +576,7 @@ public final class Room {
 	 * the same id across multiple hosts.
 	 * @return Id of this room.
 	 */
-	public long getRoomId() {
+	public int getRoomId() {
 		return roomId;
 	}
 
@@ -580,7 +594,7 @@ public final class Room {
 		}
 		JsonObject obj = new JsonParser().parse(json).getAsJsonObject();
 		List<String> tags = Jsoup.parse(obj.get("tags").getAsString()).getElementsByTag("a").stream().map(Element::html).collect(Collectors.toList());
-		return new RoomThumbs(obj.get("id").getAsLong(), obj.get("name").getAsString(), obj.get("description").getAsString(), obj.get("isFavorite").getAsBoolean(), tags);
+		return new RoomThumbs(obj.get("id").getAsInt(), obj.get("name").getAsString(), obj.get("description").getAsString(), obj.get("isFavorite").getAsBoolean(), tags);
 	}
 
 	/**

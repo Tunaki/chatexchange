@@ -71,7 +71,7 @@ public class StackExchangeClient implements AutoCloseable {
 	 * @param roomId Id of the room to join.
 	 * @return <code>Room</code> joined.
 	 */
-	public Room joinRoom(ChatHost host, long roomId) {
+	public Room joinRoom(ChatHost host, int roomId) {
 		if (rooms.stream().anyMatch(r -> r.getHost().equals(host) && r.getRoomId() == roomId)) {
 			throw new ChatOperationException("Cannot join a room you are already in.");
 		}

@@ -10,14 +10,14 @@ import java.util.List;
  * @author Tunaki
  */
 public final class RoomThumbs {
-	
-	private long id;
+
+	private int id;
 	private String name;
 	private String description;
 	private boolean favorite;
 	private List<String> tags;
-	
-	RoomThumbs(long id, String name, String description, boolean favorite, List<String> tags) {
+
+	RoomThumbs(int id, String name, String description, boolean favorite, List<String> tags) {
 		this.id = id;
 		this.name = name;
 		this.description = description;
@@ -29,12 +29,12 @@ public final class RoomThumbs {
 	 * Returns the id of this room.
 	 * @return Id of the room.
 	 */
-	public long getId() {
+	public int getId() {
 		return id;
 	}
 
 	/**
-	 * Returns the name of this room. This is also corresponds to the HTML title. 
+	 * Returns the name of this room. This is also corresponds to the HTML title.
 	 * @return Name of this room.
 	 */
 	public String getName() {

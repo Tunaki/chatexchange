@@ -6,24 +6,26 @@ import java.util.stream.StreamSupport;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
+import fr.tunaki.stackoverflow.chat.Room;
+
 /**
  * Represents an event resulting from a kick happening in the current room.
  * @author Tunaki
  */
 public class KickedEvent extends Event {
-	
+
 	private long kickeeId;
-	
-	KickedEvent(JsonElement jsonElement) {
-		super(getMasterJsonObject(jsonElement));
+
+	KickedEvent(JsonElement jsonElement, Room room) {
+		super(getMasterJsonObject(jsonElement), room);
 		JsonObject other = getJsonObjectForType(jsonElement, 4).orElseThrow(AssertionError::new);
 		kickeeId = other.get("user_id").getAsLong();
 	}
-	
+
 	private static JsonObject getMasterJsonObject(JsonElement jsonElement) {
 		return getJsonObjectForType(jsonElement, 15).orElseThrow(AssertionError::new);
 	}
-	
+
 	private static Optional<JsonObject> getJsonObjectForType(JsonElement jsonElement, int type) {
 		return StreamSupport.stream(jsonElement.getAsJsonArray().spliterator(), false).map(JsonElement::getAsJsonObject).filter(e -> e.get("event_type").getAsInt() == type).findFirst();
 	}

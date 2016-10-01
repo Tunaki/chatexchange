@@ -8,31 +8,33 @@ import java.util.function.ToLongFunction;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
+import fr.tunaki.stackoverflow.chat.Room;
+
 /**
  * Base class for all events raised in chat.
  * <p>An event represents an action that was triggered by a user or a system action. Actions made by user typically corresponds
- * to posting messages, editing messages, etc. and actions made by the system typically corresponds to feeds added, change in 
+ * to posting messages, editing messages, etc. and actions made by the system typically corresponds to feeds added, change in
  * access level, etc.
  * <p>All events have a instant at which they occured, represented by an {@link Instant} object (UTC). They also have the user that
  * triggered the action (ID and display name), with the exception of anonymous events (like starring).
- * For system events, the ID will be strictly negative and for anonymous events, it is will be 0.  
+ * For system events, the ID will be strictly negative and for anonymous events, it is will be 0.
  * @author Tunaki
  */
 public abstract class Event {
-	
+
 	private Instant instant;
 	private long userId;
 	private String userName;
-	private int roomId;
+	private Room room;
 
-	Event(JsonElement jsonElement) {
+	Event(JsonElement jsonElement, Room room) {
 		JsonObject jsonObject = jsonElement.getAsJsonObject();
 		instant = Instant.ofEpochSecond(jsonObject.get("time_stamp").getAsLong());
 		userId = orDefault(jsonObject.get("user_id"), 0, JsonElement::getAsLong);
 		userName = orDefault(jsonObject.get("user_name"), null, JsonElement::getAsString);
-		roomId = orDefault(jsonObject.get("room_id"), 0, JsonElement::getAsInt);
+		this.room = room;
 	}
-	
+
 	/**
 	 * Returns the instant in time (UTC) at which this event occured.
 	 * @return Instant in time (UTC) at which this event occured.
@@ -58,29 +60,38 @@ public abstract class Event {
 	public String getUserName() {
 		return userName;
 	}
-	
+
 	/**
-	 * The id of the room this event took place.
+	 * The room this event took place.
+	 * @return Room this event took place.
+	 */
+	public Room getRoom() {
+		return room;
+	}
+
+	/**
+	 * Returns the ID of the room this event took place. This is a short-hand for {@link Room#getRoomId()}
 	 * @return ID of the room this event took place.
+	 * @see {@link #getRoom()}
 	 */
 	public int getRoomId() {
-		return roomId;
+		return room.getRoomId();
 	}
 
 	protected <T> T orDefault(JsonElement element, T defaultValue, Function<JsonElement, T> function) {
 		return element == null ? defaultValue : function.apply(element);
 	}
-	
+
 	protected int orDefault(JsonElement element, int defaultValue, ToIntFunction<JsonElement> function) {
 		return element == null ? defaultValue : function.applyAsInt(element);
 	}
-	
+
 	protected long orDefault(JsonElement element, long defaultValue, ToLongFunction<JsonElement> function) {
 		return element == null ? defaultValue : function.applyAsLong(element);
 	}
-	
+
 	protected boolean orDefault(JsonElement element, boolean defaultValue) {
 		return element == null ? defaultValue : element.getAsBoolean();
 	}
-	
+
 }

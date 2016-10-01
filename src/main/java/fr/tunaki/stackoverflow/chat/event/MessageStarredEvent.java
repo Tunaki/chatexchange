@@ -3,7 +3,7 @@ package fr.tunaki.stackoverflow.chat.event;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
-import fr.tunaki.stackoverflow.chat.Message;
+import fr.tunaki.stackoverflow.chat.Room;
 
 /**
  * Represents the event of starring / unstarring and pining / unpining a message. There is no distinction between starring and
@@ -11,12 +11,12 @@ import fr.tunaki.stackoverflow.chat.Message;
  * @author Tunaki
  */
 public class MessageStarredEvent extends MessageEvent {
-	
+
 	private boolean starred;
 	private boolean pinned;
 
-	MessageStarredEvent(JsonElement jsonElement, Message message) {
-		super(jsonElement, message);
+	MessageStarredEvent(JsonElement jsonElement, Room room) {
+		super(jsonElement, room);
 		JsonObject jsonObject = jsonElement.getAsJsonObject();
 		starred = orDefault(jsonObject.get("message_starred"), false);
 		pinned = orDefault(jsonObject.get("message_owner_starred"), false);
