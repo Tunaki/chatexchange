@@ -1,4 +1,4 @@
-# Chatexchange
+# ChatExchange
 
 The purpose of this project is to provide a simple API to interact with the chat system on Stack Overflow, and the Stack Exchange network.
 
