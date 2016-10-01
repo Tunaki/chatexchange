@@ -52,8 +52,9 @@ public final class Message {
 	}
 
 	/**
-	 * Returns the plain content of this message. This is the original markdown source of the message.
-	 * This will be <code>null</code> if the current user is not a room-owner or this message is not one of their own message.
+	 * Returns the plain content of this message. As opposed to the {@link #getContent()} method, this corresponds
+	 * to the original Markdown source of the message, i.e. what the user exactly typed.
+	 * <p>This will be <code>null</code> if the current user is not a room-owner and this message is not one of their own message.
 	 * @return Plain content of this message.
 	 */
 	public String getPlainContent() {
@@ -61,7 +62,8 @@ public final class Message {
 	}
 
 	/**
-	 * Returns the content of this message. This is the fully rendered HTML content of the message, as it is shown in chat.
+	 * Returns the content of this message. As opposed to the {@link #getPlainContent()} method, this is the fully rendered
+	 * HTML content of the message, as it is shown on screen.
 	 * <p>For example, a message whose Markdown source is <code>[tag:java]</code> will result in a rendered content of
 	 * <code>{@literal <a href="//stackoverflow.com/questions/tagged/java"><span class="ob-post-tag" style="background-color: #E0EAF1; color: #3E6D8E; border-color: #3E6D8E; border-style: solid;">java</span></a>}</code>.
 	 * <p>This will be <code>null</code> if the current user is not a room-owner and this message is not one of their own message.
