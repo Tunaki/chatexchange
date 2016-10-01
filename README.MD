@@ -71,3 +71,11 @@ room.addEventListener(EventType.USER_MENTIONED, event -> {
 	// ...
 });
 ```
+
+Another example, showing how to listen to user joining the chat room:
+
+```java
+room.addEventListener(EventType.USER_ENTERED, event -> {
+	System.out.println("User " + event.getUserId() + " joined the room " + event.getRoomId());
+});
+```
