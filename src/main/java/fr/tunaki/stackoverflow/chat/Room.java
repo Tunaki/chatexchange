@@ -50,6 +50,7 @@ import org.jsoup.HttpStatusException;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
+import org.jsoup.parser.Parser;
 import org.jsoup.select.Elements;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -475,7 +476,7 @@ public final class Room {
 		String content;
 		try {
 			documentHistory = httpClient.get(hostUrlBase + "/messages/" + messageId + "/history", cookies, "fkey", fkey).parse();
-			content = httpClient.get(hostUrlBase + "/message/" + messageId, cookies, "fkey", fkey).body();
+			content = Parser.unescapeEntities(httpClient.get(hostUrlBase + "/message/" + messageId, cookies, "fkey", fkey).body(), false);
 		} catch (HttpStatusException e) {
 			if (e.getStatusCode() == 404) {
 				LOGGER.info("Tried to view deleted message " + messageId);
