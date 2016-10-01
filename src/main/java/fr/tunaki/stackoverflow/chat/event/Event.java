@@ -72,7 +72,7 @@ public abstract class Event {
 	/**
 	 * Returns the ID of the room this event took place. This is a short-hand for {@link Room#getRoomId()}
 	 * @return ID of the room this event took place.
-	 * @see {@link #getRoom()}
+	 * @see #getRoom()
 	 */
 	public int getRoomId() {
 		return room.getRoomId();
