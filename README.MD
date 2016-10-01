@@ -72,6 +72,9 @@ room.addEventListener(EventType.USER_MENTIONED, event -> {
 });
 ```
 
+The same could be done to listen to replies, which are messages linked to a specific message of the current logged-in user,
+with the `EventType.MESSAGE_REPLY` constant.
+
 Another example, showing how to listen to user joining the chat room:
 
 ```java
