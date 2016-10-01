@@ -21,7 +21,6 @@
     <repository>
       <id>internal.repo</id>
       <url>file://${project.build.directory}/mvn-repo</url>
-      <uniqueVersion>false</uniqueVersion>
     </repository>
   </distributionManagement>
   <build>
