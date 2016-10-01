@@ -5,6 +5,8 @@
   <version>1.0.1-SNAPSHOT</version>
   <name>ChatExchange</name>
   <description>Simple API to interact with the chat system on Stack Overflow, and the Stack Exchange network.</description>
+  <inceptionYear>2016</inceptionYear>
+  <url>https://github.com/Tunaki/chatexchange</url>
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <github.global.server>github</github.global.server>
