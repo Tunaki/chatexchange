@@ -59,6 +59,7 @@ public abstract class Event {
 	 * <p>For system generated event, the id will be strictly negative. For events where there was
 	 * no registered user, this will be 0.
 	 * @return Id of the user that raised this event.
+	 * @see #getUser()
 	 */
 	public long getUserId() {
 		return userId;
