@@ -23,6 +23,8 @@ The dependency is:
 
 ## How to use
 
+### Joining a room
+
 Start by creating a `StackExchangeClient`; this is the class used to authenticate with Stack Overflow. Give it the e-mail address you want to connect to chat with, along with the password:
 
     StackExchangeClient client = new StackExchangeClient(emailAddress, password);
@@ -39,3 +41,19 @@ Once you have a `Room` object, you can use it to send messages or reply to other
 Each method in the `Room` class runs asynchronously and returns a [`CompletionStage`](https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/CompletionStage.html) that holds the result of the action. Sending a message or replying to a message returns a `CompletionStage<Long>` holding the id of the posted message. This allows for fluid method calls, like uploading an image and posting it as a one-box:
 
     room.uploadImage(Paths.get(pathToImage)).thenAccept(room::send);
+
+### Listening to events
+
+Once a `Room` was joined, it is possible to listen to various events on it, like a user joining the chat room or a user posting
+a message. All the possible events to listen to are documented in the `EventType` class.
+
+Each event inherits from the `Event` class and gives access to several properties, like the date at which it was raised, the user that raised it and the room in which it was raised. Events related to messages further inherit from `MessageEvent`, giving access
+to the id of the message that raised the event.
+
+For example, to listen to mentions, that is to say a message that mentioned the current logged-in user with `@`, the code is
+
+	room.addEventListener(EventType.USER_MENTIONED, event -> {
+		Message message = event.getMessage(); // gets the message that triggered the mention 
+		Room room = event.getRoom(); // gets the room in which it was made
+		// ...
+	});
