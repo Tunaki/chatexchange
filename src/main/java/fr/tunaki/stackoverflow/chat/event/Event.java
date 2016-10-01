@@ -1,6 +1,7 @@
 package fr.tunaki.stackoverflow.chat.event;
 
 import java.time.Instant;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.ToIntFunction;
 import java.util.function.ToLongFunction;
@@ -9,6 +10,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
 import fr.tunaki.stackoverflow.chat.Room;
+import fr.tunaki.stackoverflow.chat.User;
 
 /**
  * Base class for all events raised in chat.
@@ -41,6 +43,15 @@ public abstract class Event {
 	 */
 	public Instant getInstant() {
 		return instant;
+	}
+
+	/**
+	 * Returns the user that raised this event.
+	 * <p>For events where there was no registered user, or system generated event, this returns an empty <code>Optional</code>.
+	 * @return User that raised this event.
+	 */
+	public Optional<User> getUser() {
+		return userId > 0 ? Optional.of(room.getUser(userId)) : Optional.empty();
 	}
 
 	/**
