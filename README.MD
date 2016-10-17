@@ -82,3 +82,30 @@ room.addEventListener(EventType.USER_ENTERED, event -> {
 	System.out.println("User " + event.getUserId() + " joined the room " + event.getRoomId());
 });
 ```
+
+### Sample usage for a bot
+
+Here's an example of using the library in order to build a simple chat bot. In this code, `email` and `password` represent
+the credentials the bot is going to use to log into Stack Exchange, and `roomId` represent the id of the room on the Chat.SO
+platform, which is the number at the end of the URL to access it: `http://chat.stackoverflow.com/rooms/{roomId}`.
+
+What it does is simply listening to all messages posted, through the `MESSAGE_POSTED` event; it replies something to the poster if that message is `"coffee"` and the bot is stopped if the message is `"die"`.
+
+```
+public static void main(String[] args) throws Exception {
+	StackExchangeClient client = new StackExchangeClient(email, password);
+	CountDownLatch countDownLatch = new CountDownLatch(1);
+    Room room = client.joinRoom(ChatHost.STACK_OVERFLOW, roomId);
+    room.addEventListener(EventType.MESSAGE_POSTED, e -> {
+    	Message message = e.getMessage();
+        switch (message.getPlainContent()) {
+        case "coffee": room.replyTo(message.getId(), "Have some coffee!"); break;
+        case "die": room.send("Bye."); countDownLatch.countDown(); break;
+        }
+    });
+    countDownLatch.await();
+    client.close();
+}
+```
+
+All of this processing happens in background threads. In this example, the main thread is kept waiting with a [`CountDownLatch`](https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/CountDownLatch.html) of 1. Once `"die"` is posted, it reaches 0 and the main thread closes the client, causing the bot to leave the room. 
