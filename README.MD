@@ -91,7 +91,7 @@ platform, which is the number at the end of the URL to access it: `http://chat.s
 
 What it does is simply listening to all messages posted, through the `MESSAGE_POSTED` event; it replies something to the poster if that message is `"coffee"` and the bot is stopped if the message is `"die"`.
 
-```
+```java
 public static void main(String[] args) throws Exception {
 	StackExchangeClient client = new StackExchangeClient(email, password);
 	CountDownLatch countDownLatch = new CountDownLatch(1);
