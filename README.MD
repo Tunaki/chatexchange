@@ -93,8 +93,8 @@ What it does is simply listening to all messages posted, through the `MESSAGE_PO
 
 ```java
 public static void main(String[] args) throws Exception {
-	StackExchangeClient client = new StackExchangeClient(email, password);
-	CountDownLatch countDownLatch = new CountDownLatch(1);
+    StackExchangeClient client = new StackExchangeClient(email, password);
+    CountDownLatch countDownLatch = new CountDownLatch(1);
     Room room = client.joinRoom(ChatHost.STACK_OVERFLOW, roomId);
     room.addEventListener(EventType.MESSAGE_POSTED, e -> {
     	Message message = e.getMessage();
@@ -103,8 +103,11 @@ public static void main(String[] args) throws Exception {
         case "die": room.send("Bye."); countDownLatch.countDown(); break;
         }
     });
-    countDownLatch.await();
-    client.close();
+    try {
+        countDownLatch.await();
+    } finally {
+        client.close();
+    }
 }
 ```
 
