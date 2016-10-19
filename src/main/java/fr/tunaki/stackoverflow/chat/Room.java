@@ -192,10 +192,7 @@ public final class Room {
 			}
 			@Override
 			public boolean onConnectFailure(Exception exception) {
-				LOGGER.error("Reconnecting to WebSocket in room {} in 5 s... there was an exception while connecting", roomId, exception);
-				try {
-					Thread.sleep(5000);
-				} catch (InterruptedException e) { }
+				LOGGER.error("Reconnecting to WebSocket in room {} in {} s... there was an exception while connecting", roomId, getDelay(), exception);
 				return true;
 			}
 		});
