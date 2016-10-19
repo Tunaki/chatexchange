@@ -100,7 +100,7 @@
     <dependency>
       <groupId>org.glassfish.tyrus.bundles</groupId>
       <artifactId>tyrus-standalone-client-jdk</artifactId>
-      <version>1.12</version>
+      <version>1.13</version>
     </dependency>
   </dependencies>
 </project>
