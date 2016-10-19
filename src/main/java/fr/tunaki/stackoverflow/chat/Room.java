@@ -171,10 +171,10 @@ public final class Room {
 			String time = post(hostUrlBase + "/chats/" + roomId + "/events").getAsJsonObject().get("time").getAsString();
 			websocketUrl += "?l=" + time;
 		} catch (ChatOperationException e) {
-			LOGGER.error("Error while retrieving WebSocket information. There will be no response on chat events!", e);
+			LOGGER.error("Error while retrieving WebSocket information for room {}. There will be no response on chat events!", roomId, e);
 			return;
 		}
-		LOGGER.debug("Connecting to chat WebSocket at URL {}", websocketUrl);
+		LOGGER.debug("Connecting to chat WebSocket at URL {} for room {}", websocketUrl, roomId);
 		ClientManager client = ClientManager.createClient(JdkClientContainer.class.getName());
 		Builder configBuilder = ClientEndpointConfig.Builder.create();
 		configBuilder.configurator(new Configurator() {
@@ -187,12 +187,12 @@ public final class Room {
 			@Override
 			public boolean onDisconnect(CloseReason closeReason) {
 				if (hasLeft) return false;
-				LOGGER.debug("Reconnecting to WebSocket... {}", closeReason);
+				LOGGER.debug("Reconnecting to WebSocket in room {}... {}", roomId, closeReason);
 				return true;
 			}
 			@Override
 			public boolean onConnectFailure(Exception exception) {
-				LOGGER.error("Reconnecting to WebSocket in 5 s... there was an exception while connecting: {}", exception);
+				LOGGER.error("Reconnecting to WebSocket in room {} in 5 s... there was an exception while connecting: {}", roomId, exception);
 				try {
 					Thread.sleep(5000);
 				} catch (InterruptedException e) { }
@@ -207,21 +207,21 @@ public final class Room {
 				}
 				@Override
 				public void onError(Session session, Throwable thr) {
-					LOGGER.error("An error occured during the processing of a message", thr);
+					LOGGER.error("An error occured during the processing of a message in room {}", roomId, thr);
 				}
 			}, configBuilder.build(), new URI(websocketUrl));
 		} catch (DeploymentException | URISyntaxException | IOException e) {
 			throw new ChatOperationException("Cannot connect to chat websocket", e);
 		}
-		LOGGER.debug("WebSocket session successfully opened.");
+		LOGGER.debug("WebSocket session successfully opened in room {}.", roomId);
 	}
 
 	private void closeWebSocket() {
 		try {
 			webSocketSession.close();
-			LOGGER.debug("WebSocket session successfully closed.");
+			LOGGER.debug("WebSocket session successfully closed in room {}.", roomId);
 		} catch (IOException e) {
-			LOGGER.error("Error while closing the WebSocket", e);
+			LOGGER.error("Error while closing the WebSocket in room {}.", roomId, e);
 		}
 	}
 
@@ -326,7 +326,7 @@ public final class Room {
 			if (successUploadMatcher.find()) {
 				return successUploadMatcher.group(1);
 			}
-			LOGGER.error("Tried to upload {} but couldn't parse result {}", fileName, html);
+			LOGGER.error("Tried to upload {} in room {} but couldn't parse result {}", fileName, roomId, html);
 			throw new ChatOperationException("Failed to upload image.");
 		});
 	}
