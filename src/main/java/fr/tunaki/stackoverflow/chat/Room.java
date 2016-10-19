@@ -7,7 +7,6 @@ import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
-import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -38,12 +37,14 @@ import java.util.stream.StreamSupport;
 import javax.websocket.ClientEndpointConfig;
 import javax.websocket.ClientEndpointConfig.Builder;
 import javax.websocket.ClientEndpointConfig.Configurator;
+import javax.websocket.CloseReason;
 import javax.websocket.DeploymentException;
 import javax.websocket.Endpoint;
 import javax.websocket.EndpointConfig;
 import javax.websocket.Session;
 
 import org.glassfish.tyrus.client.ClientManager;
+import org.glassfish.tyrus.client.ClientProperties;
 import org.glassfish.tyrus.container.jdk.client.JdkClientContainer;
 import org.jsoup.Connection.Response;
 import org.jsoup.HttpStatusException;
@@ -77,14 +78,12 @@ public final class Room {
 	private static final int NUMBER_OF_RETRIES_ON_THROTTLE = 5;
 	private static final DateTimeFormatter MESSAGE_TIME_FORMATTER = DateTimeFormatter.ofPattern("h:mm a").withZone(ZoneOffset.UTC);
 	private static final int EDIT_WINDOW_SECONDS = 115;
-	private static final int WEB_SOCKET_RESTART_SECONDS = 30;
 	private static final int MAX_CHAT_MESSAGE_LENGTH = 500;
 
 	private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
 	private final ExecutorService eventExecutor = Executors.newCachedThreadPool();
 
 	private Session webSocketSession;
-	private LocalDateTime lastWebsocketMessageDate = LocalDateTime.now();
 	private Map<EventType<Object>, List<Consumer<Object>>> chatEventListeners = new HashMap<>();
 
 	private int roomId;
@@ -108,14 +107,7 @@ public final class Room {
 		executeAndSchedule(() -> fkey = retrieveFKey(roomId), 1);
 		executeAndSchedule(this::syncPingableUsers, 24);
 		syncCurrentUsers();
-		startWebSocket();
-		executor.scheduleAtFixedRate(() -> {
-			if (ChronoUnit.SECONDS.between(lastWebsocketMessageDate, LocalDateTime.now()) > WEB_SOCKET_RESTART_SECONDS) {
-				LOGGER.debug("Rebooting the WebSocket connection after {} seconds of inactivity", WEB_SOCKET_RESTART_SECONDS);
-				closeWebSocket();
-				startWebSocket();
-			}
-		}, WEB_SOCKET_RESTART_SECONDS, WEB_SOCKET_RESTART_SECONDS, TimeUnit.SECONDS);
+		initWebSocket();
 		addEventListener(EventType.USER_ENTERED, e -> currentUserIds.add(e.getUserId()));
 		addEventListener(EventType.USER_LEFT, e -> currentUserIds.remove(e.getUserId()));
 	}
@@ -165,16 +157,24 @@ public final class Room {
 		try {
 			Response response = httpClient.get(hostUrlBase + "/rooms/" + roomId, cookies);
 			String fkey = response.parse().getElementById("fkey").val();
-			LOGGER.debug("New fkey retrieved for room {}", roomId);
+			LOGGER.debug("New fkey retrieved for room {} is {}", roomId, fkey);
 			return fkey;
 		} catch (IOException e) {
 			throw new ChatOperationException(e);
 		}
 	}
 
-	private void startWebSocket() {
-		String websocketUrl = post(hostUrlBase + "/ws-auth", "roomid", String.valueOf(roomId)).getAsJsonObject().get("url").getAsString();
-		String time = post(hostUrlBase + "/chats/" + roomId + "/events").getAsJsonObject().get("time").getAsString();
+	private void initWebSocket() {
+		String websocketUrl;
+		try {
+			websocketUrl = post(hostUrlBase + "/ws-auth", "roomid", String.valueOf(roomId)).getAsJsonObject().get("url").getAsString();
+			String time = post(hostUrlBase + "/chats/" + roomId + "/events").getAsJsonObject().get("time").getAsString();
+			websocketUrl += "?l=" + time;
+		} catch (ChatOperationException e) {
+			LOGGER.error("Error while retrieving WebSocket information. There will be no response on chat events!", e);
+			return;
+		}
+		LOGGER.debug("Connecting to chat WebSocket at URL {}", websocketUrl);
 		ClientManager client = ClientManager.createClient(JdkClientContainer.class.getName());
 		Builder configBuilder = ClientEndpointConfig.Builder.create();
 		configBuilder.configurator(new Configurator() {
@@ -183,8 +183,22 @@ public final class Room {
 				headers.put("Origin", Arrays.asList(hostUrlBase));
 			}
 		});
-		websocketUrl += "?l=" + time;
-		LOGGER.debug("Connecting to chat websocket " + websocketUrl);
+		client.getProperties().put(ClientProperties.RECONNECT_HANDLER, new ClientManager.ReconnectHandler() {
+			@Override
+			public boolean onDisconnect(CloseReason closeReason) {
+				if (hasLeft) return false;
+				LOGGER.debug("Reconnecting to WebSocket... {}", closeReason);
+				return true;
+			}
+			@Override
+			public boolean onConnectFailure(Exception exception) {
+				LOGGER.error("Reconnecting to WebSocket in 5 s... there was an exception while connecting: {}", exception);
+				try {
+					Thread.sleep(5000);
+				} catch (InterruptedException e) { }
+				return true;
+			}
+		});
 		try {
 			webSocketSession = client.connectToServer(new Endpoint() {
 				@Override
@@ -199,19 +213,20 @@ public final class Room {
 		} catch (DeploymentException | URISyntaxException | IOException e) {
 			throw new ChatOperationException("Cannot connect to chat websocket", e);
 		}
+		LOGGER.debug("WebSocket session successfully opened.");
 	}
 
 	private void closeWebSocket() {
 		try {
 			webSocketSession.close();
+			LOGGER.debug("WebSocket session successfully closed.");
 		} catch (IOException e) {
 			LOGGER.error("Error while closing the WebSocket", e);
 		}
 	}
 
 	private void handleChatEvent(String json) {
-		LOGGER.debug("Received message: " + json);
-		lastWebsocketMessageDate = LocalDateTime.now();
+		LOGGER.debug("Received message: {}", json);
 		JsonObject jsonObject = new JsonParser().parse(json).getAsJsonObject();
 		jsonObject.entrySet().stream().filter(e -> e.getKey().equals("r" + roomId)).map(Map.Entry::getValue).map(JsonElement::getAsJsonObject).map(o -> o.get("e")).filter(Objects::nonNull).map(JsonElement::getAsJsonArray).findFirst().ifPresent(events -> {
 			for (Event event : Events.fromJsonData(events, this)) {
@@ -237,7 +252,7 @@ public final class Room {
 
 	private <T> CompletableFuture<T> supplyAsync(Supplier<T> supplier) {
 		return CompletableFuture.supplyAsync(supplier, executor).whenComplete((res, thr) -> {
-			if (res != null) LOGGER.trace("Task completed successfully with result: " + res);
+			if (res != null) LOGGER.trace("Task completed successfully with result: {}", res);
 			if (thr != null) LOGGER.error("Couldn't execute task", thr);
 		});
 	}
@@ -462,8 +477,8 @@ public final class Room {
 		if (hasLeft) return;
 		LOGGER.debug("Leaving room {} on {}", roomId, host);
 		post(hostUrlBase + "/chats/leave/" + roomId, "quiet", "true");
-		close();
 		hasLeft = true;
+		close();
 	}
 
 	/**
@@ -479,7 +494,7 @@ public final class Room {
 			content = Parser.unescapeEntities(httpClient.get(hostUrlBase + "/message/" + messageId, cookies, "fkey", fkey).body(), false);
 		} catch (HttpStatusException e) {
 			if (e.getStatusCode() == 404) {
-				LOGGER.info("Tried to view deleted message " + messageId);
+				LOGGER.debug("Tried to view deleted message {}", messageId);
 				// non-RO cannot see deleted message of another user: so if 404, it means message is deleted
 				return new Message(messageId, null, null, null, true, 0, false, 0);
 			}
