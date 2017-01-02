@@ -28,12 +28,14 @@ public abstract class Event {
 	private long userId;
 	private String userName;
 	private Room room;
+	private User user;
 
 	Event(JsonElement jsonElement, Room room) {
 		JsonObject jsonObject = jsonElement.getAsJsonObject();
 		instant = Instant.ofEpochSecond(jsonObject.get("time_stamp").getAsLong());
 		userId = orDefault(jsonObject.get("user_id"), 0, JsonElement::getAsLong);
 		userName = orDefault(jsonObject.get("user_name"), null, JsonElement::getAsString);
+		user = userId > 0 ? room.getUser(userId) : null;
 		this.room = room;
 	}
 
@@ -46,12 +48,14 @@ public abstract class Event {
 	}
 
 	/**
-	 * Returns the user that raised this event.
+	 * Returns the user that raised this event, at the time the event was raised.
+	 * <p>The returned user will not be updated with regards to, e.g, reputation changes that were made after this event.
+	 * If an updated user is needed, refer to {@link Room#getUser(long)}.
 	 * <p>For events where there was no registered user, or system generated event, this returns an empty <code>Optional</code>.
 	 * @return User that raised this event.
 	 */
 	public Optional<User> getUser() {
-		return userId > 0 ? Optional.of(room.getUser(userId)) : Optional.empty();
+		return Optional.ofNullable(user);
 	}
 
 	/**
