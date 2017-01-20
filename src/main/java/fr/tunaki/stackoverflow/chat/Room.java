@@ -192,10 +192,15 @@ public final class Room {
 			}
 			@Override
 			public boolean onConnectFailure(Exception exception) {
-				LOGGER.error("Reconnecting to WebSocket in room {} in {} s... there was an exception while connecting", roomId, getDelay(), exception);
+				final int seconds = 60;
+				LOGGER.error("Reconnecting to WebSocket in room {} in {} s... there was an exception while connecting", roomId, seconds + getDelay(), exception);
+				try {
+					Thread.sleep(1000 * seconds);
+				} catch (InterruptedException e) { }
 				return true;
 			}
 		});
+		client.getProperties().put(ClientProperties.RETRY_AFTER_SERVICE_UNAVAILABLE, true);
 		try {
 			webSocketSession = client.connectToServer(new Endpoint() {
 				@Override
