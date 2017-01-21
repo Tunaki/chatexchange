@@ -7,6 +7,7 @@ import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -37,7 +38,6 @@ import java.util.stream.StreamSupport;
 import javax.websocket.ClientEndpointConfig;
 import javax.websocket.ClientEndpointConfig.Builder;
 import javax.websocket.ClientEndpointConfig.Configurator;
-import javax.websocket.CloseReason;
 import javax.websocket.DeploymentException;
 import javax.websocket.Endpoint;
 import javax.websocket.EndpointConfig;
@@ -78,12 +78,14 @@ public final class Room {
 	private static final int NUMBER_OF_RETRIES_ON_THROTTLE = 5;
 	private static final DateTimeFormatter MESSAGE_TIME_FORMATTER = DateTimeFormatter.ofPattern("h:mm a").withZone(ZoneOffset.UTC);
 	private static final int EDIT_WINDOW_SECONDS = 115;
+	private static final int WEB_SOCKET_RESTART_SECONDS = 30;
 	private static final int MAX_CHAT_MESSAGE_LENGTH = 500;
 
 	private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
 	private final ExecutorService eventExecutor = Executors.newCachedThreadPool();
 
 	private Session webSocketSession;
+	private LocalDateTime lastWebsocketMessageDate = LocalDateTime.now();
 	private Map<EventType<Object>, List<Consumer<Object>>> chatEventListeners = new HashMap<>();
 
 	private int roomId;
@@ -108,6 +110,13 @@ public final class Room {
 		executeAndSchedule(this::syncPingableUsers, 24);
 		syncCurrentUsers();
 		initWebSocket();
+		executor.scheduleAtFixedRate(() -> {
+			if (ChronoUnit.SECONDS.between(lastWebsocketMessageDate, LocalDateTime.now()) > WEB_SOCKET_RESTART_SECONDS) {
+				LOGGER.debug("Rebooting the WebSocket connection after {} seconds of inactivity", WEB_SOCKET_RESTART_SECONDS);
+				closeWebSocket();
+				initWebSocket();
+			}
+		}, WEB_SOCKET_RESTART_SECONDS, WEB_SOCKET_RESTART_SECONDS, TimeUnit.SECONDS);
 		addEventListener(EventType.USER_ENTERED, e -> currentUserIds.add(e.getUserId()));
 		addEventListener(EventType.USER_LEFT, e -> currentUserIds.remove(e.getUserId()));
 	}
@@ -183,23 +192,6 @@ public final class Room {
 				headers.put("Origin", Arrays.asList(hostUrlBase));
 			}
 		});
-		client.getProperties().put(ClientProperties.RECONNECT_HANDLER, new ClientManager.ReconnectHandler() {
-			@Override
-			public boolean onDisconnect(CloseReason closeReason) {
-				if (hasLeft) return false;
-				LOGGER.debug("Reconnecting to WebSocket in room {}... {}", roomId, closeReason);
-				return true;
-			}
-			@Override
-			public boolean onConnectFailure(Exception exception) {
-				final int seconds = 60;
-				LOGGER.error("Reconnecting to WebSocket in room {} in {} s... there was an exception while connecting", roomId, seconds + getDelay(), exception);
-				try {
-					Thread.sleep(1000 * seconds);
-				} catch (InterruptedException e) { }
-				return true;
-			}
-		});
 		client.getProperties().put(ClientProperties.RETRY_AFTER_SERVICE_UNAVAILABLE, true);
 		try {
 			webSocketSession = client.connectToServer(new Endpoint() {
@@ -229,6 +221,7 @@ public final class Room {
 
 	private void handleChatEvent(String json) {
 		LOGGER.debug("Received message: {}", json);
+		lastWebsocketMessageDate = LocalDateTime.now();
 		JsonObject jsonObject = new JsonParser().parse(json).getAsJsonObject();
 		jsonObject.entrySet().stream().filter(e -> e.getKey().equals("r" + roomId)).map(Map.Entry::getValue).map(JsonElement::getAsJsonObject).map(o -> o.get("e")).filter(Objects::nonNull).map(JsonElement::getAsJsonArray).findFirst().ifPresent(events -> {
 			for (Event event : Events.fromJsonData(events, this)) {
