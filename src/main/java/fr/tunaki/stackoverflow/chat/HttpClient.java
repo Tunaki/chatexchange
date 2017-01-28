@@ -58,7 +58,7 @@ class HttpClient {
 	}
 
 	private Response execute(Method method, String url, Map<String, String> cookies, boolean ignoreErrors, String fileKey, String fileName, InputStream inputStream, String... data) throws IOException {
-		Connection connection = Jsoup.connect(url).timeout(0).ignoreContentType(true).ignoreHttpErrors(ignoreErrors).method(method).cookies(cookies).userAgent("Mozilla").data(data);
+		Connection connection = Jsoup.connect(url).timeout(10 * 1000).ignoreContentType(true).ignoreHttpErrors(ignoreErrors).method(method).cookies(cookies).userAgent("Mozilla").data(data);
 		if (fileKey != null) {
 			connection = connection.data(fileKey, fileName, inputStream);
 		}
