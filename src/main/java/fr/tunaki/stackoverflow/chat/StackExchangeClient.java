@@ -91,20 +91,30 @@ public class StackExchangeClient implements AutoCloseable {
 		Response response = httpClient.get("http://" + host + "/users/login?returnurl=" + URLEncoder.encode("http://" + host + "/", "UTF-8"), cookies);
 		String fkey = response.parse().select("input[name='fkey']").val();
 		response = httpClient.post("http://" + host + "/users/authenticate", cookies, "fkey", fkey, "openid_identifier", openIdProvider);
+		Document document = response.parse();
 
 		// confirmation prompt?
 		if (response.url().toString().startsWith("https://openid.stackexchange.com/account/prompt")) {
-			Document document = response.parse();
 			LOGGER.trace("Confirmation prompt \n" + document.html());
 			String session = document.select("input[name='session']").first().val();
 			fkey = document.select("input[name='fkey']").first().val();
 			Response promptResponse = httpClient.post("https://openid.stackexchange.com/account/prompt/submit", cookies, "session", session, "fkey", fkey);
-			LOGGER.trace("Confirmation prompt response \n" + promptResponse.parse().html());
+			document = promptResponse.parse();
+			LOGGER.trace("Confirmation prompt response \n" + document.html());
+		}
+
+		// when the account doesn't exist on this site, confirm its creation
+		if (!document.select("form[action='/users/openidconfirm']").isEmpty()) {
+			LOGGER.debug("Account doesn't exist on target site '{}', confirming new account", host);
+			String session = document.select("input[name='s']").first().val();
+			fkey = document.select("input[name='fkey']").first().val();
+			Response newAccountResponse = httpClient.post("https://" + host + "/users/openidconfirm", cookies, "s", session, "fkey", fkey);
+			LOGGER.trace("New account confirmation response \n" + newAccountResponse.parse().html());
 		}
 
 		// check logged in
 		Response checkResponse = httpClient.get("http://" + host + "/users/current", cookies);
-		if (checkResponse.parse().getElementsByClass("reputation").first() == null) {
+		if (checkResponse.parse().getElementsByClass("js-inbox-button").first() == null) {
 			LOGGER.debug(response.parse().html());
 			throw new IllegalStateException("Unable to login to Stack Exchange.");
 		}
