@@ -114,6 +114,9 @@ public final class Room {
 			if (ChronoUnit.SECONDS.between(lastWebsocketMessageDate, LocalDateTime.now()) > WEB_SOCKET_RESTART_SECONDS) {
 				LOGGER.debug("Rebooting the WebSocket connection after {} seconds of inactivity", WEB_SOCKET_RESTART_SECONDS);
 				closeWebSocket();
+				try {
+					Thread.sleep(3000); // just wait a little for the server to really understand we closed the connection
+				} catch (InterruptedException e) { }
 				initWebSocket();
 			}
 		}, WEB_SOCKET_RESTART_SECONDS, WEB_SOCKET_RESTART_SECONDS, TimeUnit.SECONDS);
