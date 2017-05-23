@@ -21,7 +21,7 @@ The dependency is:
 <dependency>
   <groupId>fr.tunaki.stackoverflow</groupId>
   <artifactId>chatexchange</artifactId>
-  <version>1.0.1</version>
+  <version>1.1.0</version>
 </dependency>
 ```
 
@@ -87,7 +87,7 @@ room.addEventListener(EventType.USER_ENTERED, event -> {
 
 Here's an example of using the library in order to build a simple chat bot. In this code, `email` and `password` represent
 the credentials the bot is going to use to log into Stack Exchange, and `roomId` represent the id of the room on the Chat.SO
-platform, which is the number at the end of the URL to access it: `http://chat.stackoverflow.com/rooms/{roomId}`.
+platform, which is the number at the end of the URL to access it: `https://chat.stackoverflow.com/rooms/{roomId}`.
 
 What it does is simply listening to all messages posted, through the `MESSAGE_POSTED` event; it replies something to the poster if that message is `"coffee"` and the bot is stopped if the message is `"die"`.
 
