@@ -88,9 +88,9 @@ public class StackExchangeClient implements AutoCloseable {
 	}
 
 	private void siteLogin(String host) throws IOException {
-		Response response = httpClient.get("http://" + host + "/users/login?returnurl=" + URLEncoder.encode("http://" + host + "/", "UTF-8"), cookies);
+		Response response = httpClient.get("https://" + host + "/users/login?returnurl=" + URLEncoder.encode("https://" + host + "/", "UTF-8"), cookies);
 		String fkey = response.parse().select("input[name='fkey']").val();
-		response = httpClient.post("http://" + host + "/users/authenticate", cookies, "fkey", fkey, "openid_identifier", openIdProvider);
+		response = httpClient.post("https://" + host + "/users/authenticate", cookies, "fkey", fkey, "openid_identifier", openIdProvider);
 		Document document = response.parse();
 
 		// confirmation prompt?
@@ -113,7 +113,7 @@ public class StackExchangeClient implements AutoCloseable {
 		}
 
 		// check logged in
-		Response checkResponse = httpClient.get("http://" + host + "/users/current", cookies);
+		Response checkResponse = httpClient.get("https://" + host + "/users/current", cookies);
 		if (checkResponse.parse().getElementsByClass("js-inbox-button").first() == null) {
 			LOGGER.debug(response.parse().html());
 			throw new IllegalStateException("Unable to login to Stack Exchange.");
