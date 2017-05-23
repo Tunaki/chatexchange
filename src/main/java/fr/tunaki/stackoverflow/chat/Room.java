@@ -103,7 +103,7 @@ public final class Room {
 	Room(ChatHost host, int roomId, HttpClient httpClient, Map<String, String> cookies) {
 		this.roomId = roomId;
 		this.host = host;
-		hostUrlBase = "http://chat." + host.getName();
+		hostUrlBase = "https://chat." + host.getName();
 		this.httpClient = httpClient;
 		this.cookies = new HashMap<>(cookies);
 		executeAndSchedule(() -> fkey = retrieveFKey(roomId), 1);
