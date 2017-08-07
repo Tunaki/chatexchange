@@ -54,6 +54,8 @@ public final class Message {
 	/**
 	 * Returns the plain content of this message. As opposed to the {@link #getContent()} method, this corresponds
 	 * to the original Markdown source of the message, i.e. what the user exactly typed.
+	 * <p>For example, a reply to a user will appear as <code>:&lt;id&gt;</code> instead of the rendered username, and tags
+	 * will be returned as <code>[tag:java]</code>.
 	 * <p>This will be <code>null</code> if the current user is not a room-owner and this message is not one of their own message.
 	 * @return Plain content of this message.
 	 */
