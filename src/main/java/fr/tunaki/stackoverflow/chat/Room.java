@@ -501,7 +501,7 @@ public final class Room {
 			throw new ChatOperationException(e);
 		}
 		Elements contents = documentHistory.select(".messages .content");
-		String plainContent = contents.get(1).ownText(); // to get rid of the <b>said:</b> or <b>edited:</b>
+		String plainContent = contents.get(1).select(".message-source").first().text();
 		Element starVoteContainer = documentHistory.select(".messages .flash .stars.vote-count-container").first();
 		int starCount;
 		if (starVoteContainer == null) {
