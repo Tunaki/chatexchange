@@ -21,7 +21,7 @@ The dependency is:
 <dependency>
   <groupId>fr.tunaki.stackoverflow</groupId>
   <artifactId>chatexchange</artifactId>
-  <version>1.1.0</version>
+  <version>1.1.1</version>
 </dependency>
 ```
 
