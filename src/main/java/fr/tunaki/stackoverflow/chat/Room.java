@@ -580,7 +580,8 @@ public final class Room {
 			boolean owner = object.get("is_owner").isJsonNull() ? false : object.get("is_owner").getAsBoolean();
 			Instant lastSeen = object.get("last_seen").isJsonNull() ? null : Instant.ofEpochSecond(object.get("last_seen").getAsLong());
 			Instant lastMessage = object.get("last_post").isJsonNull() ? null : Instant.ofEpochSecond(object.get("last_post").getAsLong());
-			return new User(id, userName, reputation, moderator, owner, lastSeen, lastMessage, inRoom.test(id));
+			String profileLink = hostUrlBase + "/users/" + id;
+			return new User(id, userName, reputation, moderator, owner, lastSeen, lastMessage, inRoom.test(id), profileLink);
 		}).collect(Collectors.toList());
 	}
 

@@ -10,7 +10,7 @@ import java.time.Instant;
  * @author Tunaki
  */
 public final class User {
-	
+
 	private long id;
 	private String name;
 	private int reputation;
@@ -19,8 +19,9 @@ public final class User {
 	private Instant lastSeenDate;
 	private Instant lastMessageDate;
 	private boolean currentlyInRoom;
-	
-	User(long id, String name, int reputation, boolean moderator, boolean roomOwner, Instant lastSeenDate, Instant lastMessageDate, boolean currentlyInRoom) {
+	private String profileLink;
+
+	User(long id, String name, int reputation, boolean moderator, boolean roomOwner, Instant lastSeenDate, Instant lastMessageDate, boolean currentlyInRoom, String profileLink) {
 		this.id = id;
 		this.name = name;
 		this.reputation = reputation;
@@ -29,6 +30,7 @@ public final class User {
 		this.lastSeenDate = lastSeenDate;
 		this.lastMessageDate = lastMessageDate;
 		this.currentlyInRoom = currentlyInRoom;
+		this.profileLink = profileLink;
 	}
 
 	/**
@@ -95,6 +97,14 @@ public final class User {
 	 */
 	public boolean isCurrentlyInRoom() {
 		return currentlyInRoom;
+	}
+
+	/**
+	 * Returns a link to the chat user profile of this user. Note that it is distinct from the main user profile.
+	 * @return Link to the chat user profile.
+	 */
+	public String getProfileLink() {
+		return profileLink;
 	}
 
 }
