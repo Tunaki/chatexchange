@@ -3,10 +3,9 @@
   <groupId>fr.tunaki.stackoverflow</groupId>
   <artifactId>chatexchange</artifactId>
   <versioning>
-    <release>1.1.1</release>
     <versions>
-      <version>1.1.1</version>
+      <version>1.1.2-SNAPSHOT</version>
     </versions>
-    <lastUpdated>20170807173556</lastUpdated>
+    <lastUpdated>20180106192144</lastUpdated>
   </versioning>
 </metadata>

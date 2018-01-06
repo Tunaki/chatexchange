@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<metadata modelVersion="1.1.0">
+  <groupId>fr.tunaki.stackoverflow</groupId>
+  <artifactId>chatexchange</artifactId>
+  <version>1.1.2-SNAPSHOT</version>
+  <versioning>
+    <snapshot>
+      <timestamp>20180106.192144</timestamp>
+      <buildNumber>1</buildNumber>
+    </snapshot>
+    <lastUpdated>20180106192144</lastUpdated>
+    <snapshotVersions>
+      <snapshotVersion>
+        <extension>jar</extension>
+        <value>1.1.2-20180106.192144-1</value>
+        <updated>20180106192144</updated>
+      </snapshotVersion>
+      <snapshotVersion>
+        <extension>pom</extension>
+        <value>1.1.2-20180106.192144-1</value>
+        <updated>20180106192144</updated>
+      </snapshotVersion>
+    </snapshotVersions>
+  </versioning>
+</metadata>
