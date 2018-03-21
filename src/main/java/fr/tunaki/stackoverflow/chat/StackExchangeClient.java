@@ -39,8 +39,18 @@ public class StackExchangeClient implements AutoCloseable {
 	 * */
 	private HashSet<String> loggedInHosts = new HashSet<>();
 	
+	/**
+	 * The user's e-mail-address
+	 * This needs to be stored in order to login to a site when joining a room.
+	 * With OpenID, this was not necessary because we only had to login once while initializing `StackExchangeClient`
+	 * */
 	private String email = null;
 	
+	/**
+	 * The user's password
+	 * This needs to be stored in order to login to a site when joining a room.
+	 * With OpenID, this was not necessary because we only had to login once while initializing `StackExchangeClient`
+	 * */
 	private String password = null;
 
 	/**
@@ -50,35 +60,38 @@ public class StackExchangeClient implements AutoCloseable {
 	 */
 	public StackExchangeClient(String email, String password) {
 		httpClient = new HttpClient();
-		/*try {
-			//SEOpenIdLogin(email, password);
-			//seLogin(email, password, "stackoverflow.com");
-		} catch (IOException e) {
-			throw new UncheckedIOException(e);
-		}*/
 		this.email = email;
 		this.password = password;
 	}
 	
 	/**
 	 * Logs in to s given site
+	 * @param email The user's e-mail-address
+	 * @param password The password
+	 * @param The host of the main site (NOT the chat.*! Use ChatHost.getName())
 	 * */
 	private void seLogin(String email, String password, String host) throws IOException {
+		//The login-form has a hidden field called "fkey" which needs to be sent along with the mail and password
 		Response response = httpClient.get("https://"+host+"/users/login", cookies);
 		String fkey = response.parse().select("input[name='fkey']").val();
 		
 		response = httpClient.post("https://"+host+"/users/login", cookies, "email", email, "password", password, "fkey", fkey);
 		
-		// check logged in
+		// check if login succeeded
 		Response checkResponse = httpClient.get("https://"+host+"/users/current", cookies);
 		if (checkResponse.parse().getElementsByClass("js-inbox-button").first() == null) {
-			LOGGER.debug(response.parse().html());
+			LOGGER.debug(checkResponse.parse().html());
 			throw new IllegalStateException("Unable to login to Stack Exchange.");
 		}
 		
+		//Remember that the user is logged in on that site
 		this.loggedInHosts.add(host);
-	}
+	} // seLogin
 
+	/**
+	 * The old login-flow with OpenID
+	 * @deprecated in 1.2.0. See meta: https://meta.stackexchange.com/q/307647/347985
+	 * */
 	@Deprecated
 	private void SEOpenIdLogin(String email, String password) throws IOException {
 		Response response = httpClient.get("https://openid.stackexchange.com/account/login", cookies);
@@ -112,7 +125,7 @@ public class StackExchangeClient implements AutoCloseable {
 			try {
 				this.seLogin(email, password, mainSiteHost);
 			} catch (IOException e) {
-				e.printStackTrace();
+				LOGGER.error("Unable to login on " + mainSiteHost + " for " + host.getBaseUrl(), e);
 				throw new ChatOperationException("Login to " + mainSiteHost + " failed!");
 			}
 		}
@@ -120,18 +133,15 @@ public class StackExchangeClient implements AutoCloseable {
 		if (rooms.stream().anyMatch(r -> r.getHost().equals(host) && r.getRoomId() == roomId)) {
 			throw new ChatOperationException("Cannot join a room you are already in.");
 		}
-		if (rooms.stream().allMatch(r -> !r.getHost().equals(host))) {
-			/*try {
-				siteLogin(host.getName());
-			} catch (IOException e) {
-				throw new UncheckedIOException(e);
-			}*/
-		}
+		
 		Room chatRoom = new Room(host, roomId, httpClient, cookies);
 		rooms.add(chatRoom);
 		return chatRoom;
 	}
 
+	/**
+	 * @deprecated in 1.2.0: This is not required anymore, but maybe someone can re-implement the account creation in the new login-flow?
+	 * */
 	@Deprecated
 	private void siteLogin(String host) throws IOException {
 		Response response = httpClient.get("https://" + host + "/users/login?returnurl=" + URLEncoder.encode("https://" + host + "/", "UTF-8"), cookies);
