@@ -5,6 +5,7 @@ import java.io.UncheckedIOException;
 import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -32,6 +33,15 @@ public class StackExchangeClient implements AutoCloseable {
 	private Map<String, String> cookies = new HashMap<>();
 
 	private List<Room> rooms = new ArrayList<>();
+	
+	/**
+	 * Hosts where the bot is currently logged in
+	 * */
+	private HashSet<String> loggedInHosts = new HashSet<>();
+	
+	private String email = null;
+	
+	private String password = null;
 
 	/**
 	 * Constructs the client with the provided credentials. Those will be the credentials used to send messages.
@@ -40,13 +50,36 @@ public class StackExchangeClient implements AutoCloseable {
 	 */
 	public StackExchangeClient(String email, String password) {
 		httpClient = new HttpClient();
-		try {
-			SEOpenIdLogin(email, password);
+		/*try {
+			//SEOpenIdLogin(email, password);
+			//seLogin(email, password, "stackoverflow.com");
 		} catch (IOException e) {
 			throw new UncheckedIOException(e);
+		}*/
+		this.email = email;
+		this.password = password;
+	}
+	
+	/**
+	 * Logs in to s given site
+	 * */
+	private void seLogin(String email, String password, String host) throws IOException {
+		Response response = httpClient.get("https://"+host+"/users/login", cookies);
+		String fkey = response.parse().select("input[name='fkey']").val();
+		
+		response = httpClient.post("https://"+host+"/users/login", cookies, "email", email, "password", password, "fkey", fkey);
+		
+		// check logged in
+		Response checkResponse = httpClient.get("https://"+host+"/users/current", cookies);
+		if (checkResponse.parse().getElementsByClass("js-inbox-button").first() == null) {
+			LOGGER.debug(response.parse().html());
+			throw new IllegalStateException("Unable to login to Stack Exchange.");
 		}
+		
+		this.loggedInHosts.add(host);
 	}
 
+	@Deprecated
 	private void SEOpenIdLogin(String email, String password) throws IOException {
 		Response response = httpClient.get("https://openid.stackexchange.com/account/login", cookies);
 		String fkey = response.parse().select("input[name='fkey']").val();
@@ -72,21 +105,34 @@ public class StackExchangeClient implements AutoCloseable {
 	 * @return <code>Room</code> joined.
 	 */
 	public Room joinRoom(ChatHost host, int roomId) {
+		String mainSiteHost = host.getName();
+		
+		if (!this.loggedInHosts.contains(mainSiteHost)) {
+			//not logged in on that site yet
+			try {
+				this.seLogin(email, password, mainSiteHost);
+			} catch (IOException e) {
+				e.printStackTrace();
+				throw new ChatOperationException("Login to " + mainSiteHost + " failed!");
+			}
+		}
+		
 		if (rooms.stream().anyMatch(r -> r.getHost().equals(host) && r.getRoomId() == roomId)) {
 			throw new ChatOperationException("Cannot join a room you are already in.");
 		}
 		if (rooms.stream().allMatch(r -> !r.getHost().equals(host))) {
-			try {
+			/*try {
 				siteLogin(host.getName());
 			} catch (IOException e) {
 				throw new UncheckedIOException(e);
-			}
+			}*/
 		}
 		Room chatRoom = new Room(host, roomId, httpClient, cookies);
 		rooms.add(chatRoom);
 		return chatRoom;
 	}
 
+	@Deprecated
 	private void siteLogin(String host) throws IOException {
 		Response response = httpClient.get("https://" + host + "/users/login?returnurl=" + URLEncoder.encode("https://" + host + "/", "UTF-8"), cookies);
 		String fkey = response.parse().select("input[name='fkey']").val();
