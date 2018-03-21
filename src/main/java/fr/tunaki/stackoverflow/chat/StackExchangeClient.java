@@ -81,7 +81,7 @@ public class StackExchangeClient implements AutoCloseable {
 		Response checkResponse = httpClient.get("https://"+host+"/users/current", cookies);
 		if (checkResponse.parse().getElementsByClass("js-inbox-button").first() == null) {
 			LOGGER.debug(checkResponse.parse().html());
-			throw new IllegalStateException("Unable to login to Stack Exchange.");
+			throw new IllegalStateException("Unable to login to Stack Exchange. (Site: " + host + ")");
 		}
 		
 		//Remember that the user is logged in on that site
