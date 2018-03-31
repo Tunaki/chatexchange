@@ -1,17 +1,12 @@
 package fr.tunaki.stackoverflow.chat;
 
 import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import org.jsoup.Connection.Response;
-import org.jsoup.nodes.Document;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -24,14 +19,13 @@ public class StackExchangeClient implements AutoCloseable {
 
 	private static final Logger LOGGER = LoggerFactory.getLogger(StackExchangeClient.class);
 
-	private static final Pattern OPEN_ID_PROVIDER_PATTERN = Pattern.compile("(https://openid.stackexchange.com/user/.*?)\"");
-
-	private String openIdProvider;
-
 	private HttpClient httpClient;
 	private Map<String, String> cookies = new HashMap<>();
 
 	private List<Room> rooms = new ArrayList<>();
+
+	private String email;
+	private String password;
 
 	/**
 	 * Constructs the client with the provided credentials. Those will be the credentials used to send messages.
@@ -40,28 +34,8 @@ public class StackExchangeClient implements AutoCloseable {
 	 */
 	public StackExchangeClient(String email, String password) {
 		httpClient = new HttpClient();
-		try {
-			SEOpenIdLogin(email, password);
-		} catch (IOException e) {
-			throw new UncheckedIOException(e);
-		}
-	}
-
-	private void SEOpenIdLogin(String email, String password) throws IOException {
-		Response response = httpClient.get("https://openid.stackexchange.com/account/login", cookies);
-		String fkey = response.parse().select("input[name='fkey']").val();
-		response = httpClient.post("https://openid.stackexchange.com/account/login/submit", cookies, "email", email, "password", password, "fkey", fkey);
-		Document document = response.parse();
-		if (document.getElementsByClass("error").size() > 0) {
-			LOGGER.debug(document.html());
-			throw new ChatOperationException("Invalid OpenID credentials");
-		}
-		Matcher matcher = OPEN_ID_PROVIDER_PATTERN.matcher(document.getElementById("delegate").html());
-		if (!matcher.find()) {
-			LOGGER.debug(document.html());
-			throw new IllegalStateException("Cannot retrieve the OpenID provider");
-		}
-		openIdProvider = matcher.group(1);
+		this.email = email;
+		this.password = password;
 	}
 
 	/**
@@ -75,11 +49,11 @@ public class StackExchangeClient implements AutoCloseable {
 		if (rooms.stream().anyMatch(r -> r.getHost().equals(host) && r.getRoomId() == roomId)) {
 			throw new ChatOperationException("Cannot join a room you are already in.");
 		}
-		if (rooms.stream().allMatch(r -> !r.getHost().equals(host))) {
+		if (rooms.stream().noneMatch(r -> r.getHost().equals(host))) {
 			try {
-				siteLogin(host.getName());
+				seLogin(email, password, host.getName());
 			} catch (IOException e) {
-				throw new UncheckedIOException(e);
+				throw new ChatOperationException("Login to " + host + " failed!", e);
 			}
 		}
 		Room chatRoom = new Room(host, roomId, httpClient, cookies);
@@ -87,6 +61,22 @@ public class StackExchangeClient implements AutoCloseable {
 		return chatRoom;
 	}
 
+	private void seLogin(String email, String password, String host) throws IOException {
+		Response response = httpClient.get("https://" + host + "/users/login", cookies);
+		String fkey = response.parse().select("input[name='fkey']").val();
+
+		response = httpClient.post("https://" + host + "/users/login", cookies, "email", email, "password", password, "fkey", fkey);
+
+		// check logged in
+		Response checkResponse = httpClient.get("https://" + host + "/users/current", cookies);
+		if (checkResponse.parse().getElementsByClass("js-inbox-button").first() == null) {
+			LOGGER.debug(response.parse().html());
+			throw new IllegalStateException("Unable to login to Stack Exchange.");
+		}
+	}
+
+	/* FIXME: figure out how to implement account creation
+	@Deprecated
 	private void siteLogin(String host) throws IOException {
 		Response response = httpClient.get("https://" + host + "/users/login?returnurl=" + URLEncoder.encode("https://" + host + "/", "UTF-8"), cookies);
 		String fkey = response.parse().select("input[name='fkey']").val();
@@ -118,7 +108,7 @@ public class StackExchangeClient implements AutoCloseable {
 			LOGGER.debug(response.parse().html());
 			throw new IllegalStateException("Unable to login to Stack Exchange.");
 		}
-	}
+	}*/
 
 	/**
 	 * Closes this client by making the logged-in user leave all the chat rooms they joined.
