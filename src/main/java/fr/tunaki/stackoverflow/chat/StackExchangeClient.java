@@ -25,19 +25,25 @@ public class StackExchangeClient implements AutoCloseable {
 
 	private static final Logger LOGGER = LoggerFactory.getLogger(StackExchangeClient.class);
 
+	/**
+	 * @deprecated in 1.2.0. See meta: https://meta.stackexchange.com/q/307647/347985
+	 */
+	@Deprecated
 	private static final Pattern OPEN_ID_PROVIDER_PATTERN = Pattern.compile("(https://openid.stackexchange.com/user/.*?)\"");
 
+	/**
+	 * @deprecated in 1.2.0. See meta: https://meta.stackexchange.com/q/307647/347985
+	 */
+	@Deprecated
 	private String openIdProvider;
 
 	private HttpClient httpClient;
 	private Map<String, String> cookies = new HashMap<>();
 
-	private List<Room> rooms = new ArrayList<>();
-	
 	/**
-	 * Hosts where the bot is currently logged in
-	 * */
-	private HashSet<String> loggedInHosts = new HashSet<>();
+	 * Rooms the user is currently in
+	 */
+	private List<Room> rooms = new ArrayList<>();
 	
 	/**
 	 * The user's e-mail-address
@@ -82,10 +88,7 @@ public class StackExchangeClient implements AutoCloseable {
 		if (checkResponse.parse().getElementsByClass("js-inbox-button").first() == null) {
 			LOGGER.debug(checkResponse.parse().html());
 			throw new IllegalStateException("Unable to login to Stack Exchange. (Site: " + host + ")");
-		}
-		
-		//Remember that the user is logged in on that site
-		this.loggedInHosts.add(host);
+		} // if
 	} // seLogin
 
 	/**
@@ -120,7 +123,16 @@ public class StackExchangeClient implements AutoCloseable {
 	public Room joinRoom(ChatHost host, int roomId) {
 		String mainSiteHost = host.getName();
 		
-		if (!this.loggedInHosts.contains(mainSiteHost)) {
+		boolean alreadyLoggedIn = false;
+		
+		for (Room room : this.rooms) {
+			if (room.getHost().equals(host)) {
+				alreadyLoggedIn = true;
+				break;
+			} // if
+		} // for rooms
+		
+		if (!alreadyLoggedIn) {
 			//not logged in on that site yet
 			try {
 				this.seLogin(email, password, mainSiteHost);
